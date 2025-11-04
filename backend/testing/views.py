@@ -2,6 +2,7 @@
 from django.http import JsonResponse, HttpResponseBadRequest
 from django.views.decorators.http import require_GET, require_POST
 import json
+from django.middleware.csrf import get_token
 
 
 @require_GET
@@ -18,4 +19,15 @@ def echo(request):
 	except Exception:
 		return HttpResponseBadRequest("Invalid JSON")
 	return JsonResponse({"received": payload})
+
+
+@require_GET
+def get_csrf(request):
+	"""Return a CSRF token and ensure the CSRF cookie is set on the response.
+
+	Use this from Postman or an SPA to obtain the csrftoken cookie and token value
+	before making POST requests.
+	"""
+	token = get_token(request)
+	return JsonResponse({"csrfToken": token})
 
