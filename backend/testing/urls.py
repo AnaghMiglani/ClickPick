@@ -6,5 +6,5 @@ app_name = "testing"
 urlpatterns = [
     path("ping/", views.ping, name="ping"),   # GET
     path("echo/", views.echo, name="echo"),   # POST
-    path("csrf/", views.get_csrf, name="get_csrf"),
+    path("db/", views.db_test, name="db_test"),  # GET
 ]
