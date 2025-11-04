@@ -8,4 +8,14 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('auth/', include('authentication.urls')),    
     path('stationery/', include('stationery.urls')),
-] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT) + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)   #for serving static files (like admin panel css) and media files (uploaded by user)
+]
+
+# serve media and static in development
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+
+# including testing routes only in DEBUG (safe, non-production)
+if settings.DEBUG:
+    urlpatterns += [
+        path('testing/', include(('testing.urls', 'testing'), namespace='testing')),
+    ]
