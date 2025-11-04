@@ -21,13 +21,4 @@ def echo(request):
 	return JsonResponse({"received": payload})
 
 
-@require_GET
-def get_csrf(request):
-	"""Return a CSRF token and ensure the CSRF cookie is set on the response.
-
-	Use this from Postman or an SPA to obtain the csrftoken cookie and token value
-	before making POST requests.
-	"""
-	token = get_token(request)
-	return JsonResponse({"csrfToken": token})
 
