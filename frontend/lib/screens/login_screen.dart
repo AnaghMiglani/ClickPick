@@ -5,6 +5,8 @@ import 'package:clickpic/widgets/custom_button.dart';
 import 'package:clickpic/widgets/custom_text_field.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import '../service/api_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -199,7 +201,34 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildLoginButton() {
-    return CustomButton(onTap: () {}, text: 'Log In');
+    return CustomButton(onTap: () async {
+      final phone = _numController.text.trim(); // Assuming you use this for email now
+      final password = _pwdController.text.trim();
+
+      if (phone.isEmpty || password.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please enter email and password')),
+        );
+        return;
+      }
+
+      final apiService = ApiService();
+      final response = await apiService.login(phone: phone,password:  password);
+
+      if (response != null && mounted) {
+        String token = response['access'];
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('auth_token', token);
+        print("Token saved!");
+        print("Login successful! Token: ${response['access']}");
+        Navigator.pushReplacementNamed(context, '/home');
+
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Login failed. Check credentials.')),
+        );
+      }
+    }, text: 'Log In');
   }
 
   Widget _buildBottomSection() {

@@ -4,7 +4,7 @@ import 'dart:io';
 class PrintJob {
   final String id;
   final String fileName;
-
+  final File file;
   int copies;
   String color;
   String pageSize;
@@ -13,7 +13,7 @@ class PrintJob {
   PrintJob({
     required this.id,
     required this.fileName,
-    // required this.file,
+    required this.file,
     this.copies = 1,
     this.color = 'Black & White',
     this.pageSize = 'A4',
@@ -27,9 +27,9 @@ class PrintJob {
     String? comments,
   }) {
     return PrintJob(
-      id: id,
-      fileName: fileName,
-      // file: file, // Make sure to pass the original file
+      id: id ?? this.id,
+      fileName: fileName ?? this.fileName,
+      file: file ?? this.file,
       copies: copies ?? this.copies,
       color: color ?? this.color,
       pageSize: pageSize ?? this.pageSize,
