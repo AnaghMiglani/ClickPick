@@ -105,6 +105,175 @@ class GetPastPrintouts(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+# ==================== ADMIN ENDPOINTS ====================
+
+class AdminGetAllActiveOrders(APIView):
+    
+    permission_classes = (IsAuthenticated, )
+    
+    def get(self, request):
+        if request.user.role not in ['ADMIN', 'STAFF']:
+            return Response(
+                {"error": "Admin access required"}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        all_orders = ActiveOrders.objects.select_related('user', 'item').all()
+        
+        data = []
+        for order in all_orders:
+            data.append({
+                'order_id': order.order_id,
+                'user_id': order.user.id if order.user else None,
+                'user_name': order.user.name if order.user else 'Unknown',
+                'user_email': order.user.email if order.user else 'N/A',
+                'item_id': order.item.id if order.item else None,
+                'item_name': order.item.item if order.item else 'Unknown',
+                'quantity': order.quantity,
+                'cost': str(order.cost),
+                'custom_message': order.custom_message,
+                'order_time': order.order_time,
+            })
+        
+        return Response(data, status=status.HTTP_200_OK)
+
+
+class AdminGetAllActivePrintouts(APIView):
+    
+    permission_classes = (IsAuthenticated, )
+    
+    def get(self, request):
+        if request.user.role not in ['ADMIN', 'STAFF']:
+            return Response(
+                {"error": "Admin access required"}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        all_printouts = ActivePrintOuts.objects.select_related('user').all()
+        
+        data = []
+        for printout in all_printouts:
+            data.append({
+                'order_id': printout.order_id,
+                'user_id': printout.user.id if printout.user else None,
+                'user_name': printout.user.name if printout.user else 'Unknown',
+                'user_email': printout.user.email if printout.user else 'N/A',
+                'coloured_pages': printout.coloured_pages,
+                'black_and_white_pages': printout.black_and_white_pages,
+                'print_on_one_side': printout.print_on_one_side,
+                'cost': str(printout.cost),
+                'custom_message': printout.custom_message,
+                'order_time': printout.order_time,
+                'file': request.build_absolute_uri(printout.file.url) if printout.file else None,
+            })
+        
+        return Response(data, status=status.HTTP_200_OK)
+
+
+class AdminDashboardStats(APIView):
+    
+    permission_classes = (IsAuthenticated, )
+    
+    def get(self, request):
+        if request.user.role not in ['ADMIN', 'STAFF']:
+            return Response(
+                {"error": "Admin access required"}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        today = timezone.now().date()
+        
+        orders_today = ActiveOrders.objects.filter(order_time__date=today)
+        printouts_today = ActivePrintOuts.objects.filter(order_time__date=today)
+        
+        total_orders_today = orders_today.count() + printouts_today.count()
+        total_revenue_today = (
+            sum(float(o.cost) for o in orders_today) + 
+            sum(float(p.cost) for p in printouts_today)
+        )
+        
+        completed_orders_today = (
+            PastOrders.objects.filter(order_time__date=today).count() +
+            PastPrintOuts.objects.filter(order_time__date=today).count()
+        )
+        
+        active_orders_count = ActiveOrders.objects.count()
+        active_printouts_count = ActivePrintOuts.objects.count()
+        
+        return Response({
+            'new_orders_count': total_orders_today,
+            'total_revenue_today': round(total_revenue_today, 2),
+            'completed_orders_count': completed_orders_today,
+            'active_orders_count': active_orders_count,
+            'active_printouts_count': active_printouts_count,
+            'total_active_count': active_orders_count + active_printouts_count,
+        }, status=status.HTTP_200_OK)
+
+
+class AdminGetAllPastOrders(APIView):
+    
+    permission_classes = (IsAuthenticated, )
+    
+    def get(self, request):
+        if request.user.role not in ['ADMIN', 'STAFF']:
+            return Response(
+                {"error": "Admin access required"}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        all_orders = PastOrders.objects.select_related('user', 'item').all()
+        
+        data = []
+        for order in all_orders:
+            data.append({
+                'order_id': order.order_id,
+                'user_id': order.user.id if order.user else None,
+                'user_name': order.user.name if order.user else 'Unknown',
+                'user_email': order.user.email if order.user else 'N/A',
+                'item_id': order.item.id if order.item else None,
+                'item_name': order.item.item if order.item else 'Unknown',
+                'quantity': order.quantity,
+                'cost': str(order.cost),
+                'custom_message': order.custom_message,
+                'order_time': order.order_time,
+            })
+        
+        return Response(data, status=status.HTTP_200_OK)
+
+
+class AdminGetAllPastPrintouts(APIView):
+    
+    permission_classes = (IsAuthenticated, )
+    
+    def get(self, request):
+        if request.user.role not in ['ADMIN', 'STAFF']:
+            return Response(
+                {"error": "Admin access required"}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        all_printouts = PastPrintOuts.objects.select_related('user').all()
+        
+        data = []
+        for printout in all_printouts:
+            data.append({
+                'order_id': printout.order_id,
+                'user_id': printout.user.id if printout.user else None,
+                'user_name': printout.user.name if printout.user else 'Unknown',
+                'user_email': printout.user.email if printout.user else 'N/A',
+                'coloured_pages': printout.coloured_pages,
+                'black_and_white_pages': printout.black_and_white_pages,
+                'print_on_one_side': printout.print_on_one_side,
+                'cost': str(printout.cost),
+                'custom_message': printout.custom_message,
+                'order_time': printout.order_time,
+                'file': request.build_absolute_uri(printout.file.url) if printout.file else None,
+            })
+        
+        return Response(data, status=status.HTTP_200_OK)
 
 
 

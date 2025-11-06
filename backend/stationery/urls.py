@@ -9,6 +9,14 @@ urlpatterns = [
     path('past-orders/', views.GetPastOrders.as_view(), name='get_past_orders'),
     path('active-printouts/', views.GetActivePrintouts.as_view(), name='get_active_printouts'),
     path('past-printouts/', views.GetPastPrintouts.as_view(), name='get_past_printouts'),
+    
+    # admin get views:
+    path('admin/all-active-orders/', views.AdminGetAllActiveOrders.as_view(), name='admin_all_active_orders'),
+    path('admin/all-past-orders/', views.AdminGetAllPastOrders.as_view(), name='admin_all_past_orders'),
+    path('admin/all-active-printouts/', views.AdminGetAllActivePrintouts.as_view(), name='admin_all_active_printouts'),
+    path('admin/all-past-printouts/', views.AdminGetAllPastPrintouts.as_view(), name='admin_all_past_printouts'),
+    path('admin/dashboard-stats/', views.AdminDashboardStats.as_view(), name='admin_dashboard_stats'),
+    
     # post views:
     path('create-order/', views.CreateOrder.as_view(), name='create_order'),
     path('create-printout/', views.CreatePrintout.as_view(), name='create_printout'),
