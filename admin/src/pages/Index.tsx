@@ -121,7 +121,7 @@ const Index = () => {
           />
           <KPICard
             title="Total Revenue Today"
-            value={`$${stats.totalRevenue.toFixed(2)}`}
+            value={`₹${Math.floor(stats.totalRevenue)}`}
             icon={TrendingUp}
             variant="success"
           />

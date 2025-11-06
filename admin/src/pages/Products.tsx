@@ -31,7 +31,7 @@ const Products = () => {
         const formattedProducts: Product[] = items.map((item: Item) => ({
           id: String(item.id),
           name: item.item,
-          pricePerUnit: `$${parseFloat(item.price).toFixed(2)}`,
+          pricePerUnit: `₹${Math.floor(parseFloat(item.price))}`,
           available: item.in_stock,
         }));
         
@@ -81,7 +81,7 @@ const Products = () => {
       if (selectedProduct) {
         await api.updateItem(parseInt(selectedProduct.id), {
           item: productData.name,
-          price: productData.pricePerUnit.replace('$', ''),
+          price: productData.pricePerUnit.replace('₹', ''),
           in_stock: selectedProduct.available,
         });
         
@@ -94,7 +94,7 @@ const Products = () => {
       } else {
         const response = await api.createItem({
           item: productData.name,
-          price: productData.pricePerUnit.replace('$', ''),
+          price: productData.pricePerUnit.replace('₹', ''),
           in_stock: true,
         });
         

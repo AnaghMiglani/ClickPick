@@ -31,7 +31,7 @@ export const ProductEditSidebar = ({ product, isOpen, onClose, onSave, onDelete 
     if (product) {
       setFormData({
         name: product.name,
-        pricePerUnit: product.pricePerUnit.replace("$", ""),
+        pricePerUnit: product.pricePerUnit.replace("₹", ""),
       });
     } else {
       setFormData({
@@ -51,7 +51,7 @@ export const ProductEditSidebar = ({ product, isOpen, onClose, onSave, onDelete 
 
     onSave({
       name: formData.name,
-      pricePerUnit: `$${formData.pricePerUnit}`,
+      pricePerUnit: `₹${formData.pricePerUnit}`,
     });
 
     onClose();
@@ -95,15 +95,15 @@ export const ProductEditSidebar = ({ product, isOpen, onClose, onSave, onDelete 
           <div className="space-y-2">
             <Label htmlFor="price">Price (per unit) *</Label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span>
               <Input
                 id="price"
                 type="number"
-                step="0.01"
+                step="1"
                 min="0"
                 value={formData.pricePerUnit}
                 onChange={(e) => setFormData({ ...formData, pricePerUnit: e.target.value })}
-                placeholder="0.00"
+                placeholder="0"
                 className="pl-7"
                 required
               />

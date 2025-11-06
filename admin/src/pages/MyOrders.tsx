@@ -28,69 +28,71 @@ const MyOrders = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchOrders = async () => {
-      try {
-        setLoading(true);
-        
-        // Fetch all active and past orders
-        const [activeOrders, pastOrders, activePrintouts, pastPrintouts] = await Promise.all([
-          api.getAllActiveOrders(),
-          api.getAllPastOrders(),
-          api.getAllActivePrintouts(),
-          api.getAllPastPrintouts(),
-        ]);
-
-        // Helper function to calculate delivery time (mock for now)
-        const calculateDeliveryTime = (orderTime: string) => {
-          const orderDate = new Date(orderTime);
-          const now = new Date();
-          const diffMinutes = Math.floor((now.getTime() - orderDate.getTime()) / (1000 * 60));
-          return `${Math.max(5, diffMinutes)} mins`;
-        };
-
-        // Combine and format all orders
-        const formattedOrders: Order[] = [
-          ...activeOrders.map((order: BackendOrder) => ({
-            id: `#${order.order_id}`,
-            studentName: order.user_name,
-            status: "New Order" as const, // Backend doesn't have status yet
-            dateOfOrder: new Date(order.order_time).toISOString().split('T')[0],
-            deliveryTime: calculateDeliveryTime(order.order_time),
-          })),
-          ...activePrintouts.map((printout: Printout) => ({
-            id: `#P${printout.order_id}`,
-            studentName: printout.user_name,
-            status: "New Order" as const,
-            dateOfOrder: new Date(printout.order_time).toISOString().split('T')[0],
-            deliveryTime: calculateDeliveryTime(printout.order_time),
-          })),
-          ...pastOrders.map((order: BackendOrder) => ({
-            id: `#${order.order_id}`,
-            studentName: order.user_name,
-            status: "Completed" as const,
-            dateOfOrder: new Date(order.order_time).toISOString().split('T')[0],
-            deliveryTime: calculateDeliveryTime(order.order_time),
-          })),
-          ...pastPrintouts.map((printout: Printout) => ({
-            id: `#P${printout.order_id}`,
-            studentName: printout.user_name,
-            status: "Completed" as const,
-            dateOfOrder: new Date(printout.order_time).toISOString().split('T')[0],
-            deliveryTime: calculateDeliveryTime(printout.order_time),
-          })),
-        ];
-
-        setOrders(formattedOrders);
-      } catch (error) {
-        console.error("Failed to fetch orders:", error);
-        toast.error("Failed to load orders");
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchOrders();
   }, []);
+
+  const fetchOrders = async () => {
+    try {
+      setLoading(true);
+      
+      const [activeOrders, pastOrders, activePrintouts, pastPrintouts] = await Promise.all([
+        api.getAllActiveOrders(),
+        api.getAllPastOrders(),
+        api.getAllActivePrintouts(),
+        api.getAllPastPrintouts(),
+      ]);
+
+      const calculateDeliveryTime = (orderTime: string) => {
+        const orderDate = new Date(orderTime);
+        const now = new Date();
+        const diffMinutes = Math.floor((now.getTime() - orderDate.getTime()) / (1000 * 60));
+        return `${Math.max(5, diffMinutes)} mins`;
+      };
+
+      const formattedOrders: Order[] = [
+        ...activeOrders.map((order: BackendOrder) => ({
+          id: `#${order.order_id}`,
+          studentName: order.user_name,
+          status: "New Order" as const,
+          dateOfOrder: new Date(order.order_time).toISOString().split('T')[0],
+          deliveryTime: calculateDeliveryTime(order.order_time),
+        })),
+        ...activePrintouts.map((printout: Printout) => ({
+          id: `#P${printout.order_id}`,
+          studentName: printout.user_name,
+          status: "New Order" as const,
+          dateOfOrder: new Date(printout.order_time).toISOString().split('T')[0],
+          deliveryTime: calculateDeliveryTime(printout.order_time),
+        })),
+        ...pastOrders.map((order: BackendOrder) => ({
+          id: `#${order.order_id}`,
+          studentName: order.user_name,
+          status: "Completed" as const,
+          dateOfOrder: new Date(order.order_time).toISOString().split('T')[0],
+          deliveryTime: calculateDeliveryTime(order.order_time),
+        })),
+        ...pastPrintouts.map((printout: Printout) => ({
+          id: `#P${printout.order_id}`,
+          studentName: printout.user_name,
+          status: "Completed" as const,
+          dateOfOrder: new Date(printout.order_time).toISOString().split('T')[0],
+          deliveryTime: calculateDeliveryTime(printout.order_time),
+        })),
+      ];
+
+      setOrders(formattedOrders);
+    } catch (error) {
+      console.error("Failed to fetch orders:", error);
+      toast.error("Failed to load orders");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOrderComplete = () => {
+    fetchOrders();
+    toast.success("Order list updated");
+  };
 
   const getStatusVariant = (status: Order["status"]) => {
     switch (status) {
@@ -235,6 +237,7 @@ const MyOrders = () => {
         orderId={selectedOrderId}
         isOpen={selectedOrderId !== null}
         onClose={() => setSelectedOrderId(null)}
+        onOrderComplete={handleOrderComplete}
       />
     </>
   );

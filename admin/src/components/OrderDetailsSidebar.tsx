@@ -1,60 +1,144 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { FileText, Clock, X } from "lucide-react";
+import { FileText, Clock, X, Download, Package } from "lucide-react";
 import { toast } from "sonner";
+import { api, type OrderDetails, type PrintoutDetails } from "@/lib/api";
 
 interface OrderDetailsSidebarProps {
   orderId: string | null;
   isOpen: boolean;
   onClose: () => void;
+  onOrderComplete?: () => void;
 }
 
-export const OrderDetailsSidebar = ({ orderId, isOpen, onClose }: OrderDetailsSidebarProps) => {
-  const [status, setStatus] = useState<"Received" | "In Progress" | "Ready for Pickup">("Received");
+export const OrderDetailsSidebar = ({ orderId, isOpen, onClose, onOrderComplete }: OrderDetailsSidebarProps) => {
+  const [orderDetails, setOrderDetails] = useState<OrderDetails | null>(null);
+  const [printoutDetails, setPrintoutDetails] = useState<PrintoutDetails | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [isPrintout, setIsPrintout] = useState(false);
 
-  // Mock order data
-  const orderDetails = {
-    id: orderId || "#12A3",
-    totalRevenue: "₹144.00",
-    receivedTime: "4 mins ago",
-    files: [
-      "Portrait_of_Lady_El...",
-      "Portrait_of_Lady_El...",
-      "Portrait_of_Lady_El...",
-    ],
-    totalPages: 16,
-    copies: 1,
-    printType: "Black & White (₹2)",
-    pagesToPrint: [
-      { from: 2, to: 16 },
-      { from: 22, to: 32 },
-      { from: 61, to: 123 },
-    ],
-    comments: "Hey, please don't make punch holes in the first 10 sheets!!",
-  };
+  useEffect(() => {
+    if (!orderId || !isOpen) {
+      setOrderDetails(null);
+      setPrintoutDetails(null);
+      return;
+    }
+
+    const fetchDetails = async () => {
+      try {
+        setLoading(true);
+        
+        const cleanId = orderId.replace('#', '').replace('P', '');
+        const numericId = parseInt(cleanId);
+        
+        if (orderId.includes('P')) {
+          setIsPrintout(true);
+          const details = await api.getPrintoutDetails(numericId);
+          setPrintoutDetails(details);
+        } else {
+          setIsPrintout(false);
+          const details = await api.getOrderDetails(numericId);
+          setOrderDetails(details);
+        }
+      } catch (error) {
+        console.error("Failed to fetch order details:", error);
+        toast.error("Failed to load order details");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDetails();
+  }, [orderId, isOpen]);
 
   const handleDownloadFile = () => {
-    toast.success("File downloaded successfully");
-  };
-
-  const handleMarkReady = () => {
-    setStatus("Ready for Pickup");
-    toast.success("Order marked as Ready for Pickup");
-  };
-
-  const handleReportIssue = async () => {
-    try {
-      // TODO: Implement backend API call for reporting issues
-      toast.success("Issue reported. Customer has been notified and will visit your shop.");
-    } catch (error) {
-      console.error("Error reporting issue:", error);
-      toast.error("Failed to report issue");
+    if (printoutDetails?.file) {
+      window.open(printoutDetails.file, '_blank');
+      toast.success("File download started");
+    } else {
+      toast.error("No file available");
     }
   };
+
+  const handleMarkComplete = async () => {
+    try {
+      const cleanId = orderId?.replace('#', '').replace('P', '') || '';
+      const numericId = parseInt(cleanId);
+
+      if (isPrintout) {
+        await api.completePrintout(numericId);
+        toast.success("Printout order marked as complete");
+      } else {
+        await api.completeOrder(numericId);
+        toast.success("Order marked as complete");
+      }
+      
+      onOrderComplete?.();
+      onClose();
+    } catch (error) {
+      console.error("Failed to complete order:", error);
+      toast.error("Failed to complete order");
+    }
+  };
+
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    
+    if (diffMins < 60) return `${diffMins} mins ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours} hours ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays} days ago`;
+  };
+
+  const parsePageRange = (pageStr: string): { from: number; to: number }[] => {
+    if (!pageStr || pageStr.trim() === '') return [];
+    
+    const ranges: { from: number; to: number }[] = [];
+    const parts = pageStr.split(',');
+    
+    parts.forEach(part => {
+      const trimmed = part.trim();
+      if (trimmed.includes('-')) {
+        const [from, to] = trimmed.split('-').map(s => parseInt(s.trim()));
+        if (!isNaN(from) && !isNaN(to)) {
+          ranges.push({ from, to });
+        }
+      } else {
+        const num = parseInt(trimmed);
+        if (!isNaN(num)) {
+          ranges.push({ from: num, to: num });
+        }
+      }
+    });
+    
+    return ranges;
+  };
+
+  if (loading) {
+    return (
+      <Sheet open={isOpen} onOpenChange={onClose}>
+        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+          <div className="flex items-center justify-center h-96">
+            <div className="text-muted-foreground">Loading order details...</div>
+          </div>
+        </SheetContent>
+      </Sheet>
+    );
+  }
+
+  if (!orderDetails && !printoutDetails) {
+    return null;
+  }
+
+  const details = isPrintout ? printoutDetails : orderDetails;
+  if (!details) return null;
 
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
@@ -67,117 +151,181 @@ export const OrderDetailsSidebar = ({ orderId, isOpen, onClose }: OrderDetailsSi
         </SheetHeader>
 
         <div className="mt-6 space-y-6">
-          {/* Order Header */}
           <div className="flex items-start justify-between">
             <div>
-              <h3 className="text-xl font-bold">Order {orderDetails.id}</h3>
+              <h3 className="text-xl font-bold">Order {orderId}</h3>
               <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
                 <Clock className="h-4 w-4" />
-                <span>Received {orderDetails.receivedTime}</span>
+                <span>Received {formatTime(details.order_time)}</span>
               </div>
+              <p className="text-sm text-muted-foreground mt-1">{details.user_name}</p>
+              <p className="text-xs text-muted-foreground">{details.user_email}</p>
+              {details.user_number && (
+                <p className="text-xs text-muted-foreground">{details.user_number}</p>
+              )}
             </div>
             <div className="text-right">
-              <p className="text-xl font-bold">{orderDetails.totalRevenue}</p>
+              <p className="text-xl font-bold">₹{Math.floor(parseFloat(details.cost))}</p>
               <p className="text-sm text-muted-foreground">Total Revenue</p>
+              {details.is_completed && (
+                <Badge className="mt-2 bg-green-100 text-green-800 border-green-200">
+                  Completed
+                </Badge>
+              )}
             </div>
           </div>
 
-          {/* Current Status */}
-          <div className="space-y-2">
-            <p className="text-sm font-medium">Current Status</p>
-            <Select value={status} onValueChange={(value: any) => setStatus(value)}>
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Received">Received</SelectItem>
-                <SelectItem value="In Progress">In Progress</SelectItem>
-                <SelectItem value="Ready for Pickup">Ready for Pickup</SelectItem>
-              </SelectContent>
-            </Select>
-            <div className="flex gap-2 mt-3">
+          {!details.is_completed && (
+            <div className="flex gap-2">
               <Button 
-                onClick={handleMarkReady}
-                className="flex-1 border border-primary text-primary bg-transparent hover:bg-primary/10"
+                onClick={handleMarkComplete}
+                className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90"
               >
-                Mark Ready to Pickup
-              </Button>
-              <Button 
-                onClick={handleReportIssue}
-                variant="ghost"
-                className="text-destructive hover:text-destructive hover:bg-destructive/10"
-              >
-                Report Issue
+                Mark as Complete
               </Button>
             </div>
-          </div>
+          )}
 
           <Separator />
 
-          {/* Files shared with you */}
-          <div className="space-y-3">
-            <h4 className="font-semibold">Files shared with you</h4>
-            <div className="flex flex-wrap gap-2">
-              {orderDetails.files.map((file, index) => (
-                <Badge 
-                  key={index}
-                  variant="outline"
-                  className="px-3 py-2 text-sm font-normal border-primary/30 text-primary bg-primary/5"
-                >
-                  <FileText className="h-4 w-4 mr-2" />
-                  {file}
-                </Badge>
-              ))}
-            </div>
-          </div>
+          {isPrintout && printoutDetails ? (
+            <>
+              {printoutDetails.file && (
+                <div className="space-y-3">
+                  <h4 className="font-semibold">File</h4>
+                  <Badge 
+                    variant="outline"
+                    className="px-3 py-2 text-sm font-normal border-primary/30 text-primary bg-primary/5 cursor-pointer"
+                    onClick={handleDownloadFile}
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    {printoutDetails.file.split('/').pop()}
+                  </Badge>
+                </div>
+              )}
 
-          {/* Order Details Grid */}
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Total Pages</p>
-              <p className="text-lg font-bold">{orderDetails.totalPages}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Number of Copies</p>
-              <p className="text-lg font-bold">{orderDetails.copies}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Print Type</p>
-              <p className="text-lg font-bold">{orderDetails.printType}</p>
-            </div>
-          </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">B&W Pages</p>
+                  <p className="text-lg font-bold">{printoutDetails.black_and_white_pages || '0'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Colored Pages</p>
+                  <p className="text-lg font-bold">{printoutDetails.coloured_pages || '0'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Pages</p>
+                  <p className="text-lg font-bold">{printoutDetails.total_pages}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Print Mode</p>
+                  <p className="text-lg font-bold">
+                    {printoutDetails.print_on_one_side ? 'One Side' : 'Both Sides'}
+                  </p>
+                </div>
+              </div>
 
-          {/* Pages to Print */}
-          <div className="space-y-3">
-            <p className="text-sm font-medium">Pages to Print</p>
-            <div className="flex flex-wrap gap-2">
-              {orderDetails.pagesToPrint.map((range, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <div className="border border-border rounded px-3 py-2 text-center min-w-[60px]">
-                    <span className="font-medium">{range.from}</span>
-                  </div>
-                  <span className="text-muted-foreground">to</span>
-                  <div className="border border-border rounded px-3 py-2 text-center min-w-[60px]">
-                    <span className="font-medium">{range.to}</span>
+              {(printoutDetails.black_and_white_pages || printoutDetails.coloured_pages) && (
+                <div className="space-y-3">
+                  <p className="text-sm font-medium">Page Ranges</p>
+                  <div className="space-y-2">
+                    {printoutDetails.black_and_white_pages && (
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Black & White</p>
+                        <div className="flex flex-wrap gap-2">
+                          {parsePageRange(printoutDetails.black_and_white_pages).map((range, index) => (
+                            <div key={index} className="flex items-center gap-2">
+                              <div className="border border-border rounded px-3 py-2 text-center min-w-[60px]">
+                                <span className="font-medium">{range.from}</span>
+                              </div>
+                              {range.from !== range.to && (
+                                <>
+                                  <span className="text-muted-foreground">to</span>
+                                  <div className="border border-border rounded px-3 py-2 text-center min-w-[60px]">
+                                    <span className="font-medium">{range.to}</span>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {printoutDetails.coloured_pages && (
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Colored</p>
+                        <div className="flex flex-wrap gap-2">
+                          {parsePageRange(printoutDetails.coloured_pages).map((range, index) => (
+                            <div key={index} className="flex items-center gap-2">
+                              <div className="border border-border rounded px-3 py-2 text-center min-w-[60px]">
+                                <span className="font-medium">{range.from}</span>
+                              </div>
+                              {range.from !== range.to && (
+                                <>
+                                  <span className="text-muted-foreground">to</span>
+                                  <div className="border border-border rounded px-3 py-2 text-center min-w-[60px]">
+                                    <span className="font-medium">{range.to}</span>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
+              )}
 
-          {/* Comments */}
-          <div className="space-y-2">
-            <p className="text-sm font-medium">Comments</p>
-            <p className="text-sm text-foreground">{orderDetails.comments}</p>
-          </div>
+              {printoutDetails.custom_message && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Comments</p>
+                  <p className="text-sm text-foreground">{printoutDetails.custom_message}</p>
+                </div>
+              )}
 
-          {/* Download Button */}
-          <Button 
-            onClick={handleDownloadFile}
-            className="w-full bg-[hsl(180,100%,25%)] hover:bg-[hsl(180,100%,20%)] text-white font-semibold"
-          >
-            Download file
-          </Button>
+              {printoutDetails.file && (
+                <Button 
+                  onClick={handleDownloadFile}
+                  className="w-full bg-[hsl(180,100%,25%)] hover:bg-[hsl(180,100%,20%)] text-white font-semibold"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download File
+                </Button>
+              )}
+            </>
+          ) : orderDetails ? (
+            <>
+              <div className="space-y-3">
+                <h4 className="font-semibold flex items-center gap-2">
+                  <Package className="h-5 w-5" />
+                  Item Details
+                </h4>
+                <div className="border border-border rounded-lg p-4">
+                  <p className="font-semibold text-lg">{orderDetails.item_name}</p>
+                  <p className="text-sm text-muted-foreground">₹{Math.floor(parseFloat(orderDetails.item_price))} per unit</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Quantity</p>
+                  <p className="text-lg font-bold">{orderDetails.quantity}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Unit Price</p>
+                  <p className="text-lg font-bold">₹{Math.floor(parseFloat(orderDetails.item_price))}</p>
+                </div>
+              </div>
+
+              {orderDetails.custom_message && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Comments</p>
+                  <p className="text-sm text-foreground">{orderDetails.custom_message}</p>
+                </div>
+              )}
+            </>
+          ) : null}
         </div>
       </SheetContent>
     </Sheet>

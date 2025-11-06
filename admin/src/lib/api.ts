@@ -41,13 +41,46 @@ export interface Printout {
   user_id: number | null;
   user_name: string;
   user_email: string;
-  coloured_pages: number;
-  black_and_white_pages: number;
+  coloured_pages: string;
+  black_and_white_pages: string;
   print_on_one_side: boolean;
   cost: string;
   custom_message: string;
   order_time: string;
   file: string | null;
+}
+
+export interface OrderDetails {
+  order_id: string | number;
+  user_id: number | null;
+  user_name: string;
+  user_email: string;
+  user_number: string;
+  item_id: number | null;
+  item_name: string;
+  item_price: string;
+  quantity: number;
+  cost: string;
+  custom_message: string;
+  order_time: string;
+  is_completed: boolean;
+}
+
+export interface PrintoutDetails {
+  order_id: string | number;
+  user_id: number | null;
+  user_name: string;
+  user_email: string;
+  user_number: string;
+  coloured_pages: string;
+  black_and_white_pages: string;
+  print_on_one_side: boolean;
+  total_pages: number;
+  cost: string;
+  custom_message: string;
+  order_time: string;
+  file: string | null;
+  is_completed: boolean;
 }
 
 export interface DashboardStats {
@@ -118,11 +151,11 @@ export const api = {
     });
   },
 
-  getOrderDetails: async (orderId: number): Promise<any> => {
+  getOrderDetails: async (orderId: number): Promise<OrderDetails> => {
     return fetchAPI(`/stationery/admin/orders/${orderId}/`);
   },
 
-  getPrintoutDetails: async (orderId: number): Promise<any> => {
+  getPrintoutDetails: async (orderId: number): Promise<PrintoutDetails> => {
     return fetchAPI(`/stationery/admin/printouts/${orderId}/`);
   },
 
