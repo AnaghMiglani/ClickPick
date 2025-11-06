@@ -31,6 +31,7 @@ from .admin import (
     AdminDeleteItem,
     AdminCompleteOrder,
     AdminCompletePrintout,
+    SecureFileDownload,
 )
 
 __all__ = [
@@ -66,4 +67,7 @@ __all__ = [
     # Admin order management views
     'AdminCompleteOrder',
     'AdminCompletePrintout',
+    
+    # Admin file access
+    'SecureFileDownload',
 ]

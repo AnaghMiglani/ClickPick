@@ -20,9 +20,11 @@ from .order_management import (
     AdminCompleteOrder,
     AdminCompletePrintout,
 )
+from .file_access import (
+    SecureFileDownload,
+)
 
 __all__ = [
-    # Dashboard views
     'AdminGetAllActiveOrders',
     'AdminGetAllActivePrintouts',
     'AdminGetAllPastOrders',
@@ -31,13 +33,13 @@ __all__ = [
     'AdminGetOrderDetails',
     'AdminGetPrintoutDetails',
     
-    # Inventory views
     'AdminUpdateItemStock',
     'AdminUpdateItem',
     'AdminCreateItem',
     'AdminDeleteItem',
     
-    # Order management views
     'AdminCompleteOrder',
     'AdminCompletePrintout',
+    
+    'SecureFileDownload',
 ]

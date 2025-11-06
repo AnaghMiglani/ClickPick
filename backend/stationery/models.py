@@ -70,13 +70,13 @@ class PastOrders(models.Model):
 # Model for active printouts
 class ActivePrintOuts(models.Model):
     
-    order_id = models.AutoField(primary_key=True)   #auto generated auto incrementing
+    order_id = models.AutoField(primary_key=True)
     
     user = models.ForeignKey(User, max_length=50, on_delete=models.SET_NULL, null=True, db_column='user')
     
     coloured_pages = models.CharField(max_length=20)
     black_and_white_pages = models.CharField(max_length=20)
-    print_on_one_side = models.BooleanField(default=True)
+    print_on_one_side = models.BooleanField()
     cost = models.DecimalField(max_digits=6, decimal_places=2)
     custom_message = models.TextField(blank=True)
     order_time = models.DateTimeField(auto_now_add=True)
@@ -99,6 +99,7 @@ class PastPrintOuts(models.Model):
 
     coloured_pages = models.CharField(max_length=20)
     black_and_white_pages = models.CharField(max_length=20)
+    print_on_one_side = models.BooleanField()
     cost = models.DecimalField(max_digits=6, decimal_places=2)
     custom_message = models.TextField(blank=True)
     order_time = models.DateTimeField()

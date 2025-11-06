@@ -17,9 +17,8 @@ class AdminCompleteOrder(APIView):
         try:
             active_order = ActiveOrders.objects.get(order_id=order_id)
             
-            # Create past order with same data
             past_order = PastOrders(
-                order_id=order_id,
+                order_id=str(order_id),
                 user=active_order.user,
                 item=active_order.item,
                 quantity=active_order.quantity,
@@ -29,7 +28,6 @@ class AdminCompleteOrder(APIView):
             )
             past_order.save()
             
-            # Delete from active orders
             active_order.delete()
             
             return Response({
@@ -38,6 +36,8 @@ class AdminCompleteOrder(APIView):
             }, status=status.HTTP_200_OK)
         except ActiveOrders.DoesNotExist:
             return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class AdminCompletePrintout(APIView):
@@ -48,9 +48,8 @@ class AdminCompletePrintout(APIView):
         try:
             active_printout = ActivePrintOuts.objects.get(order_id=order_id)
             
-            # Create past printout with same data
             past_printout = PastPrintOuts(
-                order_id=order_id,
+                order_id=str(order_id),
                 user=active_printout.user,
                 coloured_pages=active_printout.coloured_pages,
                 black_and_white_pages=active_printout.black_and_white_pages,
@@ -62,7 +61,6 @@ class AdminCompletePrintout(APIView):
             )
             past_printout.save()
             
-            # Delete from active printouts
             active_printout.delete()
             
             return Response({
@@ -71,3 +69,5 @@ class AdminCompletePrintout(APIView):
             }, status=status.HTTP_200_OK)
         except ActivePrintOuts.DoesNotExist:
             return Response({'error': 'Printout not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -51,7 +51,7 @@ class AdminGetAllActivePrintouts(APIView):
                 'cost': str(printout.cost),
                 'custom_message': printout.custom_message,
                 'order_time': printout.order_time,
-                'file': request.build_absolute_uri(printout.file.url) if printout.file else None,
+                'has_file': bool(printout.file),
             })
         
         return Response(data, status=status.HTTP_200_OK)
@@ -102,7 +102,7 @@ class AdminGetAllPastPrintouts(APIView):
                 'cost': str(printout.cost),
                 'custom_message': printout.custom_message,
                 'order_time': printout.order_time,
-                'file': request.build_absolute_uri(printout.file.url) if printout.file else None,
+                'has_file': bool(printout.file),
             })
         
         return Response(data, status=status.HTTP_200_OK)
@@ -236,7 +236,7 @@ class AdminGetPrintoutDetails(APIView):
             'cost': str(printout.cost),
             'custom_message': printout.custom_message,
             'order_time': printout.order_time,
-            'file': request.build_absolute_uri(printout.file.url) if printout.file else None,
+            'has_file': bool(printout.file),
             'is_completed': is_completed,
         }
         
