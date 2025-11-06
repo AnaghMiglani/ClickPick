@@ -17,6 +17,18 @@ urlpatterns = [
     path('admin/all-past-printouts/', views.AdminGetAllPastPrintouts.as_view(), name='admin_all_past_printouts'),
     path('admin/dashboard-stats/', views.AdminDashboardStats.as_view(), name='admin_dashboard_stats'),
     
+    # admin inventory management:
+    path('admin/items/', views.AdminCreateItem.as_view(), name='admin_create_item'),
+    path('admin/items/<int:item_id>/', views.AdminUpdateItem.as_view(), name='admin_update_item'),
+    path('admin/items/<int:item_id>/delete/', views.AdminDeleteItem.as_view(), name='admin_delete_item'),
+    path('admin/items/<int:item_id>/toggle-stock/', views.AdminUpdateItemStock.as_view(), name='admin_toggle_stock'),
+    
+    # admin order management:
+    path('admin/orders/<int:order_id>/', views.AdminGetOrderDetails.as_view(), name='admin_order_details'),
+    path('admin/orders/<int:order_id>/complete/', views.AdminCompleteOrder.as_view(), name='admin_complete_order'),
+    path('admin/printouts/<int:order_id>/', views.AdminGetPrintoutDetails.as_view(), name='admin_printout_details'),
+    path('admin/printouts/<int:order_id>/complete/', views.AdminCompletePrintout.as_view(), name='admin_complete_printout'),
+    
     # post views:
     path('create-order/', views.CreateOrder.as_view(), name='create_order'),
     path('create-printout/', views.CreatePrintout.as_view(), name='create_printout'),

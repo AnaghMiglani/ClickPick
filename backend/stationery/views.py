@@ -537,3 +537,240 @@ class ImageToPdfAPIView(APIView):
 
         except Exception as e:
             return Response({"error": str(e)}, status=500)
+
+
+# ==================== ADMIN INVENTORY MANAGEMENT ENDPOINTS ====================
+
+class AdminUpdateItemStock(APIView):
+    """
+    Toggle item stock status (Admin/Staff only)
+    """
+    permission_classes = (IsAdminOrStaff, )
+    
+    def patch(self, request, item_id):
+        try:
+            item = Items.objects.get(id=item_id)
+            item.in_stock = not item.in_stock
+            item.save()
+            
+            return Response({
+                'message': 'Item stock status updated',
+                'item_id': item.id,
+                'in_stock': item.in_stock
+            }, status=status.HTTP_200_OK)
+        except Items.DoesNotExist:
+            return Response({'error': 'Item not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class AdminUpdateItem(APIView):
+    """
+    Update item details (Admin/Staff only)
+    """
+    permission_classes = (IsAdminOrStaff, )
+    
+    def put(self, request, item_id):
+        try:
+            item = Items.objects.get(id=item_id)
+            
+            # Update allowed fields
+            if 'item' in request.data:
+                item.item = request.data['item']
+            if 'price' in request.data:
+                item.price = request.data['price']
+            if 'in_stock' in request.data:
+                item.in_stock = request.data['in_stock']
+            
+            item.save()
+            
+            serializer = ItemsSerializer(item)
+            return Response({
+                'message': 'Item updated successfully',
+                'item': serializer.data
+            }, status=status.HTTP_200_OK)
+        except Items.DoesNotExist:
+            return Response({'error': 'Item not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class AdminCreateItem(APIView):
+    """
+    Create new item (Admin/Staff only)
+    """
+    permission_classes = (IsAdminOrStaff, )
+    
+    def post(self, request):
+        serializer = ItemsSerializer(data=request.data)
+        
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                'message': 'Item created successfully',
+                'item': serializer.data
+            }, status=status.HTTP_201_CREATED)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class AdminDeleteItem(APIView):
+    """
+    Delete item (Admin/Staff only)
+    """
+    permission_classes = (IsAdminOrStaff, )
+    
+    def delete(self, request, item_id):
+        try:
+            item = Items.objects.get(id=item_id)
+            item_name = item.item
+            item.delete()
+            
+            return Response({
+                'message': f'Item "{item_name}" deleted successfully'
+            }, status=status.HTTP_200_OK)
+        except Items.DoesNotExist:
+            return Response({'error': 'Item not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+# ==================== ADMIN ORDER MANAGEMENT ENDPOINTS ====================
+
+class AdminCompleteOrder(APIView):
+    """
+    Mark an active order as completed (move to past orders) - Admin/Staff only
+    """
+    permission_classes = (IsAdminOrStaff, )
+    
+    def post(self, request, order_id):
+        try:
+            active_order = ActiveOrders.objects.get(order_id=order_id)
+            
+            # Create past order with same data
+            past_order = PastOrders(
+                order_id=order_id,
+                user=active_order.user,
+                item=active_order.item,
+                quantity=active_order.quantity,
+                cost=active_order.cost,
+                custom_message=active_order.custom_message,
+                order_time=active_order.order_time
+            )
+            past_order.save()
+            
+            # Delete from active orders
+            active_order.delete()
+            
+            return Response({
+                'message': 'Order marked as completed',
+                'order_id': order_id
+            }, status=status.HTTP_200_OK)
+        except ActiveOrders.DoesNotExist:
+            return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class AdminCompletePrintout(APIView):
+    """
+    Mark an active printout as completed (move to past printouts) - Admin/Staff only
+    """
+    permission_classes = (IsAdminOrStaff, )
+    
+    def post(self, request, order_id):
+        try:
+            active_printout = ActivePrintOuts.objects.get(order_id=order_id)
+            
+            # Create past printout with same data
+            past_printout = PastPrintOuts(
+                order_id=order_id,
+                user=active_printout.user,
+                coloured_pages=active_printout.coloured_pages,
+                black_and_white_pages=active_printout.black_and_white_pages,
+                print_on_one_side=active_printout.print_on_one_side,
+                cost=active_printout.cost,
+                custom_message=active_printout.custom_message,
+                order_time=active_printout.order_time,
+                file=active_printout.file
+            )
+            past_printout.save()
+            
+            # Delete from active printouts
+            active_printout.delete()
+            
+            return Response({
+                'message': 'Printout marked as completed',
+                'order_id': order_id
+            }, status=status.HTTP_200_OK)
+        except ActivePrintOuts.DoesNotExist:
+            return Response({'error': 'Printout not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+class AdminGetOrderDetails(APIView):
+    """
+    Get detailed information for a specific order (Admin/Staff only)
+    """
+    permission_classes = (IsAdminOrStaff, )
+    
+    def get(self, request, order_id):
+        # Try to find in active orders first
+        try:
+            order = ActiveOrders.objects.select_related('user', 'item').get(order_id=order_id)
+            is_completed = False
+        except ActiveOrders.DoesNotExist:
+            # Try past orders
+            try:
+                order = PastOrders.objects.select_related('user', 'item').get(order_id=order_id)
+                is_completed = True
+            except PastOrders.DoesNotExist:
+                return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        data = {
+            'order_id': order.order_id,
+            'user_id': order.user.id if order.user else None,
+            'user_name': order.user.name if order.user else 'Unknown',
+            'user_email': order.user.email if order.user else 'N/A',
+            'user_number': order.user.number if order.user else 'N/A',
+            'item_id': order.item.id if order.item else None,
+            'item_name': order.item.item if order.item else 'Unknown',
+            'item_price': str(order.item.price) if order.item else '0',
+            'quantity': order.quantity,
+            'cost': str(order.cost),
+            'custom_message': order.custom_message,
+            'order_time': order.order_time,
+            'is_completed': is_completed,
+        }
+        
+        return Response(data, status=status.HTTP_200_OK)
+
+
+class AdminGetPrintoutDetails(APIView):
+    """
+    Get detailed information for a specific printout (Admin/Staff only)
+    """
+    permission_classes = (IsAdminOrStaff, )
+    
+    def get(self, request, order_id):
+        # Try to find in active printouts first
+        try:
+            printout = ActivePrintOuts.objects.select_related('user').get(order_id=order_id)
+            is_completed = False
+        except ActivePrintOuts.DoesNotExist:
+            # Try past printouts
+            try:
+                printout = PastPrintOuts.objects.select_related('user').get(order_id=order_id)
+                is_completed = True
+            except PastPrintOuts.DoesNotExist:
+                return Response({'error': 'Printout not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        data = {
+            'order_id': printout.order_id,
+            'user_id': printout.user.id if printout.user else None,
+            'user_name': printout.user.name if printout.user else 'Unknown',
+            'user_email': printout.user.email if printout.user else 'N/A',
+            'user_number': printout.user.number if printout.user else 'N/A',
+            'coloured_pages': printout.coloured_pages,
+            'black_and_white_pages': printout.black_and_white_pages,
+            'print_on_one_side': printout.print_on_one_side,
+            'total_pages': printout.coloured_pages + printout.black_and_white_pages,
+            'cost': str(printout.cost),
+            'custom_message': printout.custom_message,
+            'order_time': printout.order_time,
+            'file': request.build_absolute_uri(printout.file.url) if printout.file else None,
+            'is_completed': is_completed,
+        }
+        
+        return Response(data, status=status.HTTP_200_OK)
