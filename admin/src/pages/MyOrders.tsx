@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ArrowUpDown, Search } from "lucide-react";
 import { OrderDetailsSidebar } from "@/components/OrderDetailsSidebar";
+import { api, type Order as BackendOrder, type Printout } from "@/lib/api";
+import { toast } from "sonner";
 
 interface Order {
   id: string;
@@ -22,17 +24,73 @@ const MyOrders = () => {
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [sortField, setSortField] = useState<SortField>("dateOfOrder");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const [orders] = useState<Order[]>([
-    { id: "#12A3", studentName: "Ansh Kapila", status: "New Order", dateOfOrder: "2024-01-15", deliveryTime: "5 mins" },
-    { id: "#12A4", studentName: "Rahul Sharma", status: "In Progress", dateOfOrder: "2024-01-15", deliveryTime: "8 mins" },
-    { id: "#12A5", studentName: "Priya Patel", status: "Pending", dateOfOrder: "2024-01-14", deliveryTime: "12 mins" },
-    { id: "#12A6", studentName: "Amit Kumar", status: "Completed", dateOfOrder: "2024-01-14", deliveryTime: "7 mins" },
-    { id: "#12A7", studentName: "Sneha Reddy", status: "Completed", dateOfOrder: "2024-01-13", deliveryTime: "6 mins" },
-    { id: "#12A8", studentName: "Vikram Singh", status: "Completed", dateOfOrder: "2024-01-13", deliveryTime: "10 mins" },
-    { id: "#12A9", studentName: "Neha Gupta", status: "In Progress", dateOfOrder: "2024-01-12", deliveryTime: "15 mins" },
-    { id: "#12B0", studentName: "Rohit Verma", status: "Completed", dateOfOrder: "2024-01-12", deliveryTime: "9 mins" },
-  ]);
+  useEffect(() => {
+    const fetchOrders = async () => {
+      try {
+        setLoading(true);
+        
+        // Fetch all active and past orders
+        const [activeOrders, pastOrders, activePrintouts, pastPrintouts] = await Promise.all([
+          api.getAllActiveOrders(),
+          api.getAllPastOrders(),
+          api.getAllActivePrintouts(),
+          api.getAllPastPrintouts(),
+        ]);
+
+        // Helper function to calculate delivery time (mock for now)
+        const calculateDeliveryTime = (orderTime: string) => {
+          const orderDate = new Date(orderTime);
+          const now = new Date();
+          const diffMinutes = Math.floor((now.getTime() - orderDate.getTime()) / (1000 * 60));
+          return `${Math.max(5, diffMinutes)} mins`;
+        };
+
+        // Combine and format all orders
+        const formattedOrders: Order[] = [
+          ...activeOrders.map((order: BackendOrder) => ({
+            id: `#${order.order_id}`,
+            studentName: order.user_name,
+            status: "New Order" as const, // Backend doesn't have status yet
+            dateOfOrder: new Date(order.order_time).toISOString().split('T')[0],
+            deliveryTime: calculateDeliveryTime(order.order_time),
+          })),
+          ...activePrintouts.map((printout: Printout) => ({
+            id: `#P${printout.order_id}`,
+            studentName: printout.user_name,
+            status: "New Order" as const,
+            dateOfOrder: new Date(printout.order_time).toISOString().split('T')[0],
+            deliveryTime: calculateDeliveryTime(printout.order_time),
+          })),
+          ...pastOrders.map((order: BackendOrder) => ({
+            id: `#${order.order_id}`,
+            studentName: order.user_name,
+            status: "Completed" as const,
+            dateOfOrder: new Date(order.order_time).toISOString().split('T')[0],
+            deliveryTime: calculateDeliveryTime(order.order_time),
+          })),
+          ...pastPrintouts.map((printout: Printout) => ({
+            id: `#P${printout.order_id}`,
+            studentName: printout.user_name,
+            status: "Completed" as const,
+            dateOfOrder: new Date(printout.order_time).toISOString().split('T')[0],
+            deliveryTime: calculateDeliveryTime(printout.order_time),
+          })),
+        ];
+
+        setOrders(formattedOrders);
+      } catch (error) {
+        console.error("Failed to fetch orders:", error);
+        toast.error("Failed to load orders");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchOrders();
+  }, []);
 
   const getStatusVariant = (status: Order["status"]) => {
     switch (status) {
@@ -57,6 +115,14 @@ const MyOrders = () => {
       setSortOrder("asc");
     }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-muted-foreground">Loading orders...</div>
+      </div>
+    );
+  }
 
   const filteredAndSortedOrders = orders
     .filter(order =>
