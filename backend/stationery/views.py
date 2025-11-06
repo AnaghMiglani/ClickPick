@@ -6,6 +6,7 @@ from rest_framework import status
 
 from . models import ActiveOrders, PastOrders, ActivePrintOuts, PastPrintOuts, Items
 from . serializers import ActiveOrdersSerializer, PastOrdersSerializer, ActivePrintoutsSerializer, PastPrintoutsSerializer, ItemsSerializer
+from . permissions import IsAdminOrStaff
 
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
@@ -108,16 +109,8 @@ class GetPastPrintouts(APIView):
 # ==================== ADMIN ENDPOINTS ====================
 
 class AdminGetAllActiveOrders(APIView):
-    
-    permission_classes = (IsAuthenticated, )
-    
+    permission_classes = (IsAdminOrStaff, )
     def get(self, request):
-        if request.user.role not in ['ADMIN', 'STAFF']:
-            return Response(
-                {"error": "Admin access required"}, 
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
         all_orders = ActiveOrders.objects.select_related('user', 'item').all()
         
         data = []
@@ -139,16 +132,9 @@ class AdminGetAllActiveOrders(APIView):
 
 
 class AdminGetAllActivePrintouts(APIView):
-    
-    permission_classes = (IsAuthenticated, )
+    permission_classes = (IsAdminOrStaff, )
     
     def get(self, request):
-        if request.user.role not in ['ADMIN', 'STAFF']:
-            return Response(
-                {"error": "Admin access required"}, 
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
         all_printouts = ActivePrintOuts.objects.select_related('user').all()
         
         data = []
@@ -171,16 +157,9 @@ class AdminGetAllActivePrintouts(APIView):
 
 
 class AdminDashboardStats(APIView):
-    
-    permission_classes = (IsAuthenticated, )
+    permission_classes = (IsAdminOrStaff, )
     
     def get(self, request):
-        if request.user.role not in ['ADMIN', 'STAFF']:
-            return Response(
-                {"error": "Admin access required"}, 
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
         from django.utils import timezone
         from datetime import timedelta
         
@@ -214,16 +193,9 @@ class AdminDashboardStats(APIView):
 
 
 class AdminGetAllPastOrders(APIView):
-    
-    permission_classes = (IsAuthenticated, )
+    permission_classes = (IsAdminOrStaff, )
     
     def get(self, request):
-        if request.user.role not in ['ADMIN', 'STAFF']:
-            return Response(
-                {"error": "Admin access required"}, 
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
         all_orders = PastOrders.objects.select_related('user', 'item').all()
         
         data = []
@@ -245,15 +217,9 @@ class AdminGetAllPastOrders(APIView):
 
 
 class AdminGetAllPastPrintouts(APIView):
-    
-    permission_classes = (IsAuthenticated, )
+    permission_classes = (IsAdminOrStaff, )
     
     def get(self, request):
-        if request.user.role not in ['ADMIN', 'STAFF']:
-            return Response(
-                {"error": "Admin access required"}, 
-                status=status.HTTP_403_FORBIDDEN
-            )
         
         all_printouts = PastPrintOuts.objects.select_related('user').all()
         
