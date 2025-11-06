@@ -1,4 +1,3 @@
-import 'package:clickpic/screens/upload_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
@@ -21,7 +20,9 @@ class CheckoutScreen extends StatefulWidget {
 class _CheckoutScreenState extends State<CheckoutScreen> {
   late Razorpay _razorpay;
   bool _isProcessing = false;
-
+  bool _isCalculatingCost = true;
+  double _calculatedSubtotal = 0.0;
+  String? _costError;
   @override
   void initState() {
     super.initState();
@@ -29,6 +30,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
     _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
     _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
+    getcost();
   }
 
   @override
@@ -36,7 +38,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     _razorpay.clear();
     super.dispose();
   }
+  Future<void> getcost() async {
+    final cart = context.read<CartProvider>();
+    final api = ApiService();
 
+    final cost = await api.calculateTotalCost(cart.itemList);
+
+    if (mounted) {
+      setState(() {
+        _isCalculatingCost = false;
+        if (cost != null) {
+          _calculatedSubtotal = cost;
+        } else {
+          _costError = "Could not calculate exact cost. Using estimate.";
+          _calculatedSubtotal = cart.totalPrice;
+        }
+      });
+    }
+  }
   void _handlePaymentSuccess(PaymentSuccessResponse response) {
 
     Navigator.pushAndRemoveUntil(
@@ -59,7 +78,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   void _handleExternalWallet(ExternalWalletResponse response) {
-    // Handle external wallet (like Paytm) if needed
   }
 
   /// 1. New function to handle the 2-step process: Upload -> Pay
@@ -141,7 +159,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Widget build(BuildContext context) {
     final cart = context.watch<CartProvider>();
     final cartItems = cart.itemList;
-    final double subtotal = cart.totalPrice;
+    final double subtotal = _calculatedSubtotal;
     final double tax = subtotal * 0.05;
     final double totalAmount = subtotal + tax;
 
@@ -169,51 +187,65 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             const Text('Order Summary',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(12),
+            if (_isCalculatingCost)
+              const Padding(
+                padding: EdgeInsets.all(32.0),
+                child: Center(child: Column(
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text("Analyzing files for exact cost..."),
+                  ],
+                )),
+              )
+            else ...[
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  children: [
+                    if (cartItems.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8.0),
+                        child: Text("Your cart is empty"),
+                      )
+                    else
+                      ...cartItems
+                          .map((item) => _buildCartItemRow(item: item))
+                          .toList(),
+                    const Divider(height: 24),
+                    SummaryRow(
+                        title: 'Subtotal',
+                        amount: '₹${subtotal.toStringAsFixed(2)}'),
+                    const SizedBox(height: 8),
+                    SummaryRow(
+                        title: 'Tax & Fees (5%)',
+                        amount: '₹${tax.toStringAsFixed(2)}'),
+                    const Divider(height: 24),
+                    SummaryRow(
+                        title: 'Total',
+                        amount: '₹${totalAmount.toStringAsFixed(2)}',
+                        isTotal: true),
+                  ],
+                ),
               ),
-              child: Column(
-                children: [
-                  if (cartItems.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 8.0),
-                      child: Text("Your cart is empty"),
-                    )
-                  else
-                    ...cartItems
-                        .map((item) => _buildCartItemRow(item: item))
-                        .toList(),
-                  const Divider(height: 24),
-                  SummaryRow(
-                      title: 'Subtotal',
-                      amount: '₹${subtotal.toStringAsFixed(2)}'),
-                  const SizedBox(height: 8),
-                  SummaryRow(
-                      title: 'Tax & Fees (5%)',
-                      amount: '₹${tax.toStringAsFixed(2)}'),
-                  const Divider(height: 24),
-                  SummaryRow(
-                      title: 'Total',
-                      amount: '₹${totalAmount.toStringAsFixed(2)}',
-                      isTotal: true),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24), // Reduced this space slightly
+              if (_costError != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8.0),
+                  child: Text(_costError!, style: const TextStyle(color: Colors.red, fontSize: 12)),
+                ),
+            ],
+
+            const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
               height: 50,
               child: OutlinedButton.icon(
                 onPressed: () {
-                  // Pop back to UploadScreen if it's 2 steps back in the stack
                   Navigator.of(context).popUntil((route) => route.isFirst);
-                  // Or if you want to go specifically to upload screen, you might need named routes
-                  // For now, popping twice might work depending on your navigation flow:
-                  // Navigator.of(context).pop();
-                  // Navigator.of(context).pop();
                 },
                 icon: const Icon(
                     Icons.add_circle_outline, color: AppColors.primary,
