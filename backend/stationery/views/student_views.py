@@ -39,7 +39,7 @@ class GetActiveOrders(APIView):
         for order in serializer.data:
             item = Items.objects.get(pk=order['item'])
             order['item_name'] = item.item
-            order['item_display_image'] = item.display_image.url
+            order['item_display_image'] = item.display_image.url if item.display_image else None
             orders_data.append(order)
 
         return Response(orders_data, status=status.HTTP_200_OK)
@@ -58,7 +58,7 @@ class GetPastOrders(APIView):
         for order in serializer.data:
             item = Items.objects.get(pk=order['item'])
             order['item_name'] = item.item
-            order['item_display_image'] = item.display_image.url
+            order['item_display_image'] = item.display_image.url if item.display_image else None
             orders_data.append(order)
 
         return Response(orders_data, status=status.HTTP_200_OK)

@@ -197,6 +197,32 @@ class AdminGetPrintoutDetails(APIView):
             except PastPrintOuts.DoesNotExist:
                 return Response({'error': 'Printout not found'}, status=status.HTTP_404_NOT_FOUND)
         
+        def count_pages_in_range(page_range_str):
+            """Count total pages from a range string like '1-5,10-15' """
+            if not page_range_str or page_range_str.strip() == '':
+                return 0
+            
+            total = 0
+            parts = page_range_str.split(',')
+            for part in parts:
+                part = part.strip()
+                if '-' in part:
+                    try:
+                        start, end = part.split('-')
+                        total += int(end) - int(start) + 1
+                    except:
+                        pass
+                else:
+                    try:
+                        int(part)
+                        total += 1
+                    except:
+                        pass
+            return total
+        
+        bw_pages = count_pages_in_range(printout.black_and_white_pages)
+        color_pages = count_pages_in_range(printout.coloured_pages)
+        
         data = {
             'order_id': printout.order_id,
             'user_id': printout.user.id if printout.user else None,
@@ -206,7 +232,7 @@ class AdminGetPrintoutDetails(APIView):
             'coloured_pages': printout.coloured_pages,
             'black_and_white_pages': printout.black_and_white_pages,
             'print_on_one_side': printout.print_on_one_side,
-            'total_pages': printout.coloured_pages + printout.black_and_white_pages,
+            'total_pages': bw_pages + color_pages,
             'cost': str(printout.cost),
             'custom_message': printout.custom_message,
             'order_time': printout.order_time,

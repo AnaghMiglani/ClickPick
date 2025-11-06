@@ -10,7 +10,7 @@ export const DashboardLayout = () => {
 
   const navItems = [
     { title: "Home", url: "/", icon: Home },
-    { title: "My Products", url: "/products", icon: Package },
+    { title: "My Inventory", url: "/products", icon: Package },
     { title: "My Orders", url: "/orders", icon: List },
     { title: "Profile", url: "/profile", icon: User },
   ];

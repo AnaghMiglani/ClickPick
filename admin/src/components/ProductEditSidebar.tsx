@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
-interface Product {
+interface InventoryItem {
   id: string;
   name: string;
   pricePerUnit: string;
@@ -14,11 +14,11 @@ interface Product {
 }
 
 interface ProductEditSidebarProps {
-  product: Product | null;
+  product: InventoryItem | null;
   isOpen: boolean;
   onClose: () => void;
-  onSave: (product: Omit<Product, "id" | "available">) => void;
-  onDelete?: (productId: string) => void;
+  onSave: (item: Omit<InventoryItem, "id" | "available">) => void;
+  onDelete?: (itemId: string) => void;
 }
 
 export const ProductEditSidebar = ({ product, isOpen, onClose, onSave, onDelete }: ProductEditSidebarProps) => {
@@ -72,7 +72,7 @@ export const ProductEditSidebar = ({ product, isOpen, onClose, onSave, onDelete 
         <SheetHeader className="border-b border-border pb-4">
           <div className="flex items-center justify-between">
             <SheetTitle className="text-2xl font-bold">
-              {product ? "Edit Product" : "Add New Product"}
+              {product ? "Edit Item" : "Add New Item"}
             </SheetTitle>
             <Button variant="ghost" size="icon" onClick={onClose}>
               <X className="h-5 w-5" />
@@ -82,7 +82,7 @@ export const ProductEditSidebar = ({ product, isOpen, onClose, onSave, onDelete 
 
         <form onSubmit={handleSubmit} className="space-y-6 pt-6">
           <div className="space-y-2">
-            <Label htmlFor="name">Product/Service Name *</Label>
+            <Label htmlFor="name">Item/Service Name *</Label>
             <Input
               id="name"
               value={formData.name}
@@ -112,7 +112,7 @@ export const ProductEditSidebar = ({ product, isOpen, onClose, onSave, onDelete 
 
           <div className="flex gap-3 pt-4">
             <Button type="submit" className="flex-1">
-              {product ? "Save Changes" : "Add Product"}
+              {product ? "Save Changes" : "Add Item"}
             </Button>
             <Button type="button" variant="outline" onClick={onClose} className="flex-1">
               Cancel
@@ -127,7 +127,7 @@ export const ProductEditSidebar = ({ product, isOpen, onClose, onSave, onDelete 
                 onClick={handleDelete}
                 className="w-full"
               >
-                Delete Product
+                Delete Item
               </Button>
             </div>
           )}

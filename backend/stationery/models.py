@@ -10,13 +10,15 @@ class Items(models.Model):
     item = models.CharField(max_length=25)
     price = models.DecimalField(max_digits=6, decimal_places=2)
     in_stock = models.BooleanField(default=True)
-    display_image = models.ImageField(upload_to=utils.upload_display_image)
+    display_image = models.ImageField(upload_to=utils.upload_display_image, null=True, blank=True)
 
     def __str__(self):
         return self.item
 
-    def image_preview(self):   #for previewing photo in admin panel
-        return mark_safe(f'<img src = "{self.display_image.url}" width = "100"/>')
+    def image_preview(self):
+        if self.display_image:
+            return mark_safe(f'<img src = "{self.display_image.url}" width = "100"/>')
+        return "No image"
 
     class Meta:
         db_table = 'stationery_items'  

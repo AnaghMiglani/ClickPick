@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { ProductEditSidebar } from "@/components/ProductEditSidebar";
 import { api, type Item } from "@/lib/api";
 
-interface Product {
+interface InventoryItem {
   id: string;
   name: string;
   pricePerUnit: string;
@@ -17,120 +17,120 @@ interface Product {
 
 const Products = () => {
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const [isEditSidebarOpen, setIsEditSidebarOpen] = useState(false);
-  const [products, setProducts] = useState<Product[]>([]);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchProducts = async () => {
+    const fetchInventory = async () => {
       try {
         setLoading(true);
         const items = await api.getItems();
         
-        const formattedProducts: Product[] = items.map((item: Item) => ({
+        const formattedInventory: InventoryItem[] = items.map((item: Item) => ({
           id: String(item.id),
           name: item.item,
           pricePerUnit: `₹${Math.floor(parseFloat(item.price))}`,
           available: item.in_stock,
         }));
         
-        setProducts(formattedProducts);
+        setInventory(formattedInventory);
       } catch (error) {
-        console.error("Failed to fetch products:", error);
-        toast.error("Failed to load products");
+        console.error("Failed to fetch inventory:", error);
+        toast.error("Failed to load inventory");
       } finally {
         setLoading(false);
       }
     };
 
-    fetchProducts();
+    fetchInventory();
   }, []);
 
-  const handleToggleAvailability = async (productId: string) => {
+  const handleToggleAvailability = async (itemId: string) => {
     try {
-      await api.toggleItemStock(parseInt(productId));
+      await api.toggleItemStock(parseInt(itemId));
       
-      setProducts(products.map(product => 
-        product.id === productId 
-          ? { ...product, available: !product.available }
-          : product
+      setInventory(inventory.map(item => 
+        item.id === itemId 
+          ? { ...item, available: !item.available }
+          : item
       ));
-      toast.success("Product availability updated");
+      toast.success("Item availability updated");
     } catch (error) {
       console.error("Failed to toggle availability:", error);
-      toast.error("Failed to update product availability");
+      toast.error("Failed to update item availability");
     }
   };
 
-  const handleEditProduct = (productId: string) => {
-    const product = products.find(p => p.id === productId);
-    if (product) {
-      setSelectedProduct(product);
+  const handleEditItem = (itemId: string) => {
+    const item = inventory.find(p => p.id === itemId);
+    if (item) {
+      setSelectedItem(item);
       setIsEditSidebarOpen(true);
     }
   };
 
-  const handleAddProduct = () => {
-    setSelectedProduct(null);
+  const handleAddItem = () => {
+    setSelectedItem(null);
     setIsEditSidebarOpen(true);
   };
 
-  const handleSaveProduct = async (productData: Omit<Product, "id" | "available">) => {
+  const handleSaveItem = async (itemData: Omit<InventoryItem, "id" | "available">) => {
     try {
-      if (selectedProduct) {
-        await api.updateItem(parseInt(selectedProduct.id), {
-          item: productData.name,
-          price: productData.pricePerUnit.replace('₹', ''),
-          in_stock: selectedProduct.available,
+      if (selectedItem) {
+        await api.updateItem(parseInt(selectedItem.id), {
+          item: itemData.name,
+          price: itemData.pricePerUnit.replace('₹', ''),
+          in_stock: selectedItem.available,
         });
         
-        setProducts(products.map(p => 
-          p.id === selectedProduct.id 
-            ? { ...p, ...productData }
+        setInventory(inventory.map(p => 
+          p.id === selectedItem.id 
+            ? { ...p, ...itemData }
             : p
         ));
-        toast.success("Product updated successfully");
+        toast.success("Item updated successfully");
       } else {
         const response = await api.createItem({
-          item: productData.name,
-          price: productData.pricePerUnit.replace('₹', ''),
+          item: itemData.name,
+          price: itemData.pricePerUnit.replace('₹', ''),
           in_stock: true,
         });
         
-        const newProduct: Product = {
+        const newItem: InventoryItem = {
           id: String(response.item.id),
-          ...productData,
+          ...itemData,
           available: true,
         };
-        setProducts([...products, newProduct]);
-        toast.success("Product added successfully");
+        setInventory([...inventory, newItem]);
+        toast.success("Item added successfully");
       }
     } catch (error) {
-      console.error("Failed to save product:", error);
-      toast.error(selectedProduct ? "Failed to update product" : "Failed to create product");
+      console.error("Failed to save item:", error);
+      toast.error(selectedItem ? "Failed to update item" : "Failed to create item");
     }
   };
 
-  const handleDeleteProduct = async (productId: string) => {
+  const handleDeleteItem = async (itemId: string) => {
     try {
-      await api.deleteItem(parseInt(productId));
-      setProducts(products.filter(p => p.id !== productId));
-      toast.success("Product deleted successfully");
+      await api.deleteItem(parseInt(itemId));
+      setInventory(inventory.filter(p => p.id !== itemId));
+      toast.success("Item deleted successfully");
     } catch (error) {
-      console.error("Failed to delete product:", error);
-      toast.error("Failed to delete product");
+      console.error("Failed to delete item:", error);
+      toast.error("Failed to delete item");
     }
   };
 
-  const filteredProducts = products.filter(product =>
-    product.name.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredInventory = inventory.filter(item =>
+    item.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <div className="text-muted-foreground">Loading products...</div>
+        <div className="text-muted-foreground">Loading inventory...</div>
       </div>
     );
   }
@@ -139,17 +139,17 @@ const Products = () => {
     <>
       <div className="space-y-8">
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold text-foreground">My Products</h1>
-          <Button onClick={handleAddProduct} className="gap-2">
+          <h1 className="text-3xl font-bold text-foreground">My Inventory</h1>
+          <Button onClick={handleAddItem} className="gap-2">
             <Plus className="h-4 w-4" />
-            Add New Product
+            Add New Item
           </Button>
         </div>
 
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search for your Products"
+            placeholder="Search inventory"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
@@ -160,28 +160,28 @@ const Products = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Product Name</TableHead>
+                <TableHead>Item Name</TableHead>
                 <TableHead>Price/Unit</TableHead>
                 <TableHead>Availability</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredProducts.map((product) => (
-                <TableRow key={product.id} className="hover:bg-muted/50">
-                  <TableCell className="font-medium">{product.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{product.pricePerUnit}</TableCell>
+              {filteredInventory.map((item) => (
+                <TableRow key={item.id} className="hover:bg-muted/50">
+                  <TableCell className="font-medium">{item.name}</TableCell>
+                  <TableCell className="text-muted-foreground">{item.pricePerUnit}</TableCell>
                   <TableCell>
                     <Switch
-                      checked={product.available}
-                      onCheckedChange={() => handleToggleAvailability(product.id)}
+                      checked={item.available}
+                      onCheckedChange={() => handleToggleAvailability(item.id)}
                     />
                   </TableCell>
                   <TableCell className="text-right">
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleEditProduct(product.id)}
+                      onClick={() => handleEditItem(item.id)}
                       className="text-primary hover:text-primary hover:bg-transparent"
                     >
                       <Pencil className="mr-2 h-4 w-4" />
@@ -196,11 +196,11 @@ const Products = () => {
       </div>
 
       <ProductEditSidebar
-        product={selectedProduct}
+        product={selectedItem}
         isOpen={isEditSidebarOpen}
         onClose={() => setIsEditSidebarOpen(false)}
-        onSave={handleSaveProduct}
-        onDelete={handleDeleteProduct}
+        onSave={handleSaveItem}
+        onDelete={handleDeleteItem}
       />
     </>
   );
