@@ -47,7 +47,7 @@ export interface Printout {
   cost: string;
   custom_message: string;
   order_time: string;
-  file: string | null;
+  has_file: boolean;
 }
 
 export interface OrderDetails {
@@ -79,7 +79,7 @@ export interface PrintoutDetails {
   cost: string;
   custom_message: string;
   order_time: string;
-  file: string | null;
+  has_file: boolean;
   is_completed: boolean;
 }
 
@@ -169,6 +169,31 @@ export const api = {
     return fetchAPI(`/stationery/admin/printouts/${orderId}/complete/`, {
       method: "POST",
     });
+  },
+
+  downloadPrintoutFile: async (orderId: number): Promise<void> => {
+    const token = localStorage.getItem("access_token");
+    const url = `${API_BASE_URL}/stationery/admin/printouts/${orderId}/download/`;
+    
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Download failed: ${response.statusText}`);
+    }
+
+    const blob = await response.blob();
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    a.download = `printout-${orderId}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(downloadUrl);
+    document.body.removeChild(a);
   },
 
   getMyActiveOrders: async (): Promise<Order[]> => {

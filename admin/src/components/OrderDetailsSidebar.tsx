@@ -54,12 +54,20 @@ export const OrderDetailsSidebar = ({ orderId, isOpen, onClose, onOrderComplete 
     fetchDetails();
   }, [orderId, isOpen]);
 
-  const handleDownloadFile = () => {
-    if (printoutDetails?.file) {
-      window.open(printoutDetails.file, '_blank');
-      toast.success("File download started");
-    } else {
+  const handleDownloadFile = async () => {
+    if (!printoutDetails?.has_file) {
       toast.error("No file available");
+      return;
+    }
+
+    try {
+      const cleanId = orderId?.replace('#', '').replace('P', '') || '';
+      const numericId = parseInt(cleanId);
+      await api.downloadPrintoutFile(numericId);
+      toast.success("File downloaded successfully");
+    } catch (error) {
+      console.error("Failed to download file:", error);
+      toast.error("Failed to download file");
     }
   };
 
@@ -190,7 +198,7 @@ export const OrderDetailsSidebar = ({ orderId, isOpen, onClose, onOrderComplete 
 
           {isPrintout && printoutDetails ? (
             <>
-              {printoutDetails.file && (
+              {printoutDetails.has_file && (
                 <div className="space-y-3">
                   <h4 className="font-semibold">File</h4>
                   <Badge 
@@ -199,7 +207,7 @@ export const OrderDetailsSidebar = ({ orderId, isOpen, onClose, onOrderComplete 
                     onClick={handleDownloadFile}
                   >
                     <FileText className="h-4 w-4 mr-2" />
-                    {printoutDetails.file.split('/').pop()}
+                    printout-{printoutDetails.order_id}.pdf
                   </Badge>
                 </div>
               )}
@@ -284,7 +292,7 @@ export const OrderDetailsSidebar = ({ orderId, isOpen, onClose, onOrderComplete 
                 </div>
               )}
 
-              {printoutDetails.file && (
+              {printoutDetails.has_file && (
                 <Button 
                   onClick={handleDownloadFile}
                   className="w-full bg-[hsl(180,100%,25%)] hover:bg-[hsl(180,100%,20%)] text-white font-semibold"
