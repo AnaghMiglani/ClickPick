@@ -3,6 +3,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser
 from rest_framework import status
+import json
 
 from . models import ActiveOrders, PastOrders, ActivePrintOuts, PastPrintOuts, Items
 from . serializers import ActiveOrdersSerializer, PastOrdersSerializer, ActivePrintoutsSerializer, PastPrintoutsSerializer, ItemsSerializer
@@ -189,17 +190,76 @@ class CreatePrintout(APIView):
 
     def post(self, request):
         
+        # Helper to safely extract list-like fields whether they come as
+        # an actual list, a JSON string, a comma-separated string, or a
+        # QueryDict (which supports getlist).
+        def _get_list(key):
+            # If request.FILES has the key (for file lists), prefer that
+            if key == 'files':
+                return request.FILES.getlist('files')
+
+            # If request.data is a QueryDict it has getlist
+            data = request.data
+            try:
+                # QueryDict has getlist
+                return data.getlist(key)
+            except Exception:
+                pass
+
+            value = data.get(key, [])
+            if isinstance(value, list):
+                return value
+            if value is None:
+                return []
+            if isinstance(value, str):
+                # Try JSON decode first
+                try:
+                    parsed = json.loads(value)
+                    if isinstance(parsed, list):
+                        return parsed
+                except Exception:
+                    pass
+                # Fallback to comma-separated
+                return [v.strip() for v in value.split(',') if v.strip()]
+            # Other scalar values
+            return [value]
+
         # Get the files array, b&w pages array, and coloured pages array
-        files = request.FILES.getlist('files')
-        black_and_white_pages = request.data.getlist('pages')
-        coloured_pages = request.data.getlist('colouredpages')
-        costs = request.data.getlist('costs')
-        print_on_one_side_list = request.data.getlist('print_on_one_side_list')
-        custom_messages = request.data.getlist('custom_messages')
+        files = _get_list('files')
+        black_and_white_pages = _get_list('pages')
+        coloured_pages = _get_list('colouredpages')
+        costs = _get_list('costs')
+        print_on_one_side_list = _get_list('print_on_one_side_list')
+        custom_messages = _get_list('custom_messages')
 
         try:
             # Perform the iteration for each file
             n = len(files)
+
+            # Helper to normalize list-like inputs so they align with files.
+            # If a list contains a single element, broadcast it to length n.
+            # If empty, replace with n empty strings. If length mismatches
+            # and is not 1, raise a clear error.
+            def _normalize_list(lst, name, default_empty=''):
+                # Convert non-list scalars into list
+                if not isinstance(lst, list):
+                    lst = [lst]
+
+                # If list contains non-string items, keep them as-is (costs may be numbers)
+                if len(lst) == 0:
+                    return [default_empty] * n
+                if len(lst) == 1 and n > 1:
+                    return [lst[0]] * n
+                if len(lst) != n:
+                    raise ValueError(f"Field '{name}' length ({len(lst)}) does not match number of files ({n}). Provide one value per file or a single value to broadcast.")
+                return lst
+
+            # Normalize all per-file lists
+            black_and_white_pages = _normalize_list(black_and_white_pages, 'pages', default_empty='')
+            coloured_pages = _normalize_list(coloured_pages, 'colouredpages', default_empty='')
+            costs = _normalize_list(costs, 'costs', default_empty='0')
+            print_on_one_side_list = _normalize_list(print_on_one_side_list, 'print_on_one_side_list', default_empty='true')
+            custom_messages = _normalize_list(custom_messages, 'custom_messages', default_empty='')
 
             for i in range(n):
                 file = files[i]
@@ -213,9 +273,9 @@ class CreatePrintout(APIView):
                     'user': request.user.pk,
                     'coloured_pages': coloured_page,
                     'black_and_white_pages': black_and_white_page,
-                    'cost': float(cost),
+                    'cost': float(cost) if cost != '' else 0.0,
                     'custom_message': custom_message,
-                    'print_on_one_side': print_on_one_side,
+                    'print_on_one_side': True if str(print_on_one_side).lower() in ['true', '1', 'yes'] else False,
                     'file': file,
                 }
 
@@ -234,30 +294,90 @@ class CreatePrintout(APIView):
 
 
 def parse_page_ranges(page_ranges):
+    # Be robust: accept None, empty string, a single string like '1-3,5',
+    # or a list of such strings. Skip empty or invalid entries instead
+    # of raising an exception for safety.
+    if not page_ranges:
+        return []
+
     pages_to_check = []
 
-    ranges = page_ranges.split(',')
-    for item in ranges:
+    # If a list is provided, flatten it
+    if isinstance(page_ranges, list):
+        for pr in page_ranges:
+            pages_to_check.extend(parse_page_ranges(pr))
+        return pages_to_check
+
+    # Work with string form
+    s = str(page_ranges).strip()
+    if not s:
+        return []
+
+    parts = [p.strip() for p in s.split(',') if p.strip()]
+    for item in parts:
         if '-' in item:
-            start, end = map(int, item.split('-'))
-            pages_to_check.extend(range(start, end + 1))
+            bounds = [b.strip() for b in item.split('-')]
+            if len(bounds) != 2:
+                continue
+            try:
+                start = int(bounds[0])
+                end = int(bounds[1])
+            except ValueError:
+                # skip invalid ranges
+                continue
+            if end >= start:
+                pages_to_check.extend(range(start, end + 1))
+            else:
+                pages_to_check.extend(range(end, start + 1))
         else:
-            pages_to_check.append(int(item))
-    
-    return pages_to_check        
+            try:
+                pages_to_check.append(int(item))
+            except ValueError:
+                # skip invalid items like empty strings
+                continue
+
+    return pages_to_check
                 
 # To calculate cost for printouts   
 # 2rs for b & w page
 # 5rs for b & w page with output on it
-# 5rs for coloured page
+# 10rs for coloured page
 class CostCalculationView(APIView):
     
     def post(self, request):
         
         # Get the files array, b&w pages array, and coloured pages array
-        files = request.FILES.getlist('files')
-        pages = request.data.getlist('pages')
-        coloured_pages = request.data.getlist('colouredpages')
+        # Reuse the same robust extractor used above (but define locally
+        # in case this module is imported and the CreatePrintout helper
+        # is not available at runtime). It mirrors the behavior of
+        # QueryDict.getlist when available and falls back to parsing
+        # strings or JSON lists.
+        def _get_list_local(key):
+            if key == 'files':
+                return request.FILES.getlist('files')
+            data = request.data
+            try:
+                return data.getlist(key)
+            except Exception:
+                pass
+            value = data.get(key, [])
+            if isinstance(value, list):
+                return value
+            if value is None:
+                return []
+            if isinstance(value, str):
+                try:
+                    parsed = json.loads(value)
+                    if isinstance(parsed, list):
+                        return parsed
+                except Exception:
+                    pass
+                return [v.strip() for v in value.split(',') if v.strip()]
+            return [value]
+
+        files = _get_list_local('files')
+        pages = _get_list_local('pages')
+        coloured_pages = _get_list_local('colouredpages')
 
         # initialize the cost to 0
         cost = 0
@@ -265,6 +385,25 @@ class CostCalculationView(APIView):
         try:
             # Perform the iteration for each file
             n = len(files)
+
+            # Normalize per-file lists (broadcast single value to all files,
+            # default to empty string if missing, or raise on mismatch).
+            def _normalize_local(lst, name, default_empty=''):
+                if not isinstance(lst, list):
+                    lst = [lst]
+                if len(lst) == 0:
+                    return [default_empty] * n
+                if len(lst) == 1 and n > 1:
+                    return [lst[0]] * n
+                if len(lst) != n:
+                    raise ValueError(f"Field '{name}' length ({len(lst)}) does not match number of files ({n}). Provide one value per file or a single value to broadcast.")
+                return lst
+
+            try:
+                pages = _normalize_local(pages, 'pages', default_empty='')
+                coloured_pages = _normalize_local(coloured_pages, 'colouredpages', default_empty='')
+            except ValueError as ve:
+                return Response({'error': str(ve)}, status=status.HTTP_400_BAD_REQUEST)
 
             for i in range(n):
                 file = files[i]
