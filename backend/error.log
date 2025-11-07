@@ -310,3 +310,69 @@ Traceback (most recent call last):
     raise RuntimeError(
 RuntimeError: You called this URL via POST, but the URL doesn't end in a slash and you have APPEND_SLASH set. Django can't redirect to the slash URL while maintaining POST data. Change your form to point to localhost:8000/testing/echo/ (note the trailing slash), or set APPEND_SLASH=False in your Django settings.
 "POST /testing/echo HTTP/1.1" 500 80166
+Internal Server Error: /stationery/admin/printouts/1/
+Traceback (most recent call last):
+  File "C:\Arpan\Coding\WebDev\BYTE\ClickPick\backend\.venv\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Arpan\Coding\WebDev\BYTE\ClickPick\backend\.venv\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Arpan\Coding\WebDev\BYTE\ClickPick\backend\.venv\lib\site-packages\django\views\decorators\csrf.py", line 65, in _view_wrapper
+    return view_func(request, *args, **kwargs)
+  File "C:\Arpan\Coding\WebDev\BYTE\ClickPick\backend\.venv\lib\site-packages\django\views\generic\base.py", line 104, in view
+    return self.dispatch(request, *args, **kwargs)
+  File "C:\Arpan\Coding\WebDev\BYTE\ClickPick\backend\.venv\lib\site-packages\rest_framework\views.py", line 509, in dispatch
+    response = self.handle_exception(exc)
+  File "C:\Arpan\Coding\WebDev\BYTE\ClickPick\backend\.venv\lib\site-packages\rest_framework\views.py", line 469, in handle_exception
+    self.raise_uncaught_exception(exc)
+  File "C:\Arpan\Coding\WebDev\BYTE\ClickPick\backend\.venv\lib\site-packages\rest_framework\views.py", line 480, in raise_uncaught_exception
+    raise exc
+  File "C:\Arpan\Coding\WebDev\BYTE\ClickPick\backend\.venv\lib\site-packages\rest_framework\views.py", line 506, in dispatch
+    response = handler(request, *args, **kwargs)
+  File "C:\Arpan\Coding\WebDev\BYTE\ClickPick\backend\stationery\views\admin\dashboard.py", line 245, in get
+    bw_pages = count_pages_in_range(printout.black_and_white_pages)
+AttributeError: 'ActivePrintOuts' object has no attribute 'black_and_white_pages'
+"GET /stationery/admin/printouts/1/ HTTP/1.1" 500 102545
+Internal Server Error: /stationery/admin/printouts/1/
+Traceback (most recent call last):
+  File "C:\Arpan\Coding\WebDev\BYTE\ClickPick\backend\.venv\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Arpan\Coding\WebDev\BYTE\ClickPick\backend\.venv\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Arpan\Coding\WebDev\BYTE\ClickPick\backend\.venv\lib\site-packages\django\views\decorators\csrf.py", line 65, in _view_wrapper
+    return view_func(request, *args, **kwargs)
+  File "C:\Arpan\Coding\WebDev\BYTE\ClickPick\backend\.venv\lib\site-packages\django\views\generic\base.py", line 104, in view
+    return self.dispatch(request, *args, **kwargs)
+  File "C:\Arpan\Coding\WebDev\BYTE\ClickPick\backend\.venv\lib\site-packages\rest_framework\views.py", line 509, in dispatch
+    response = self.handle_exception(exc)
+  File "C:\Arpan\Coding\WebDev\BYTE\ClickPick\backend\.venv\lib\site-packages\rest_framework\views.py", line 469, in handle_exception
+    self.raise_uncaught_exception(exc)
+  File "C:\Arpan\Coding\WebDev\BYTE\ClickPick\backend\.venv\lib\site-packages\rest_framework\views.py", line 480, in raise_uncaught_exception
+    raise exc
+  File "C:\Arpan\Coding\WebDev\BYTE\ClickPick\backend\.venv\lib\site-packages\rest_framework\views.py", line 506, in dispatch
+    response = handler(request, *args, **kwargs)
+  File "C:\Arpan\Coding\WebDev\BYTE\ClickPick\backend\stationery\views\admin\dashboard.py", line 245, in get
+    bw_pages = count_pages_in_range(printout.black_and_white_pages)
+AttributeError: 'ActivePrintOuts' object has no attribute 'black_and_white_pages'
+"GET /stationery/admin/printouts/1/ HTTP/1.1" 500 102545
+Internal Server Error: /stationery/admin/printouts/1/
+Traceback (most recent call last):
+  File "C:\Arpan\Coding\WebDev\BYTE\ClickPick\backend\.venv\lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+  File "C:\Arpan\Coding\WebDev\BYTE\ClickPick\backend\.venv\lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+  File "C:\Arpan\Coding\WebDev\BYTE\ClickPick\backend\.venv\lib\site-packages\django\views\decorators\csrf.py", line 65, in _view_wrapper
+    return view_func(request, *args, **kwargs)
+  File "C:\Arpan\Coding\WebDev\BYTE\ClickPick\backend\.venv\lib\site-packages\django\views\generic\base.py", line 104, in view
+    return self.dispatch(request, *args, **kwargs)
+  File "C:\Arpan\Coding\WebDev\BYTE\ClickPick\backend\.venv\lib\site-packages\rest_framework\views.py", line 509, in dispatch
+    response = self.handle_exception(exc)
+  File "C:\Arpan\Coding\WebDev\BYTE\ClickPick\backend\.venv\lib\site-packages\rest_framework\views.py", line 469, in handle_exception
+    self.raise_uncaught_exception(exc)
+  File "C:\Arpan\Coding\WebDev\BYTE\ClickPick\backend\.venv\lib\site-packages\rest_framework\views.py", line 480, in raise_uncaught_exception
+    raise exc
+  File "C:\Arpan\Coding\WebDev\BYTE\ClickPick\backend\.venv\lib\site-packages\rest_framework\views.py", line 506, in dispatch
+    response = handler(request, *args, **kwargs)
+  File "C:\Arpan\Coding\WebDev\BYTE\ClickPick\backend\stationery\views\admin\dashboard.py", line 245, in get
+    bw_pages = count_pages_in_range(printout.black_and_white_pages)
+AttributeError: 'ActivePrintOuts' object has no attribute 'black_and_white_pages'
+"GET /stationery/admin/printouts/1/ HTTP/1.1" 500 102545

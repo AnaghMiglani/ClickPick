@@ -1,4 +1,5 @@
 from django.shortcuts import render, redirect
+from django.contrib.admin.views.decorators import staff_member_required
 from . models import ActiveOrders, PastOrders, ActivePrintOuts, PastPrintOuts
 
 from django.utils import timezone
@@ -6,7 +7,9 @@ from datetime import timedelta, datetime
 import calendar
 
 
-# For marking an active order as completed (past) 
+# For marking an active order as completed (past)
+# @staff_member_required ensures only Django admin users can access this
+@staff_member_required
 def delete_active_order(request, order_id):
     
     active_order = ActiveOrders.objects.get(order_id=order_id)
@@ -21,22 +24,42 @@ def delete_active_order(request, order_id):
     return redirect('/admin/stationery/activeorders/')
 
 # For marking an active printout as completed (past)
+@staff_member_required
 def delete_active_printout(request, order_id):
+    from .models import PrintoutFile
     
     active_printout = ActivePrintOuts.objects.get(order_id=order_id)
 
-    new_past_printout = PastPrintOuts(order_id=order_id, user=active_printout.user, coloured_pages=active_printout.coloured_pages,
-                                black_and_white_pages=active_printout.black_and_white_pages, cost=active_printout.cost,
-                                custom_message=active_printout.custom_message, order_time=active_printout.order_time,
-                                file=active_printout.file)
-
+    # Create the past printout without parent-level print specs
+    new_past_printout = PastPrintOuts(
+        order_id=order_id, 
+        user=active_printout.user, 
+        cost=active_printout.cost,
+        custom_message=active_printout.custom_message, 
+        order_time=active_printout.order_time,
+        file=active_printout.file
+    )
     new_past_printout.save()
+    
+    # Move all associated PrintoutFile objects to the past printout
+    for file_obj in active_printout.files.all():
+        PrintoutFile.objects.create(
+            printout_past=new_past_printout,
+            file=file_obj.file,
+            file_name=file_obj.file_name,
+            file_size=file_obj.file_size,
+            coloured_pages=file_obj.coloured_pages,
+            black_and_white_pages=file_obj.black_and_white_pages,
+            print_on_one_side=file_obj.print_on_one_side,
+        )
+    
     active_printout.delete()
     
     return redirect('/admin/stationery/activeprintouts/')
 
 
 # For daily, weekly and monthly orders report
+@staff_member_required
 def generate_order_report(request, duration):
     today = timezone.now().date()
 
@@ -68,6 +91,7 @@ def generate_order_report(request, duration):
     return render(request, 'stationery/orders/report-pdfs.html', context)
 
 # For custom dates orders report
+@staff_member_required
 def generate_custom_order_report(request):
     
     if request.method == 'POST':
@@ -101,6 +125,7 @@ def generate_custom_order_report(request):
         
 
 # For daily, weekly and monthly printouts report
+@staff_member_required
 def generate_printout_report(request, duration):
     today = timezone.now().date()
 
@@ -132,6 +157,7 @@ def generate_printout_report(request, duration):
     return render(request, 'stationery/printouts/report-pdfs.html', context)
 
 # For custom dates printouts report
+@staff_member_required
 def generate_custom_printout_report(request):
     
     if request.method == 'POST':
