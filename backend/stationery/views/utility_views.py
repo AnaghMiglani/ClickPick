@@ -18,6 +18,7 @@ from ..generate_firstpage import firstpage
 from ..pdf_watermark import watermark
 from ..img_to_pdf import img_to_pdf
 from ..word_to_pdf import docx_to_pdf
+import fitz
 
 
 def parse_page_ranges(page_ranges):
@@ -209,3 +210,87 @@ class ImageToPdfAPIView(APIView):
 
         except Exception as e:
             return Response({"error": str(e)}, status=500)
+
+
+class ModPdfView(APIView):
+    """Create a modified PDF containing only the requested pages.
+
+    Expects multipart/form-data with:
+      - file (File): the uploaded PDF
+      - pages (str): page ranges like '1-3,5' or a JSON array string
+
+    Saves temporary output as 'temp_files/<orig>-mod.pdf', returns the PDF,
+    and deletes the temp files after building the response.
+    """
+    parser_classes = [MultiPartParser]
+
+    def post(self, request, format=None):
+        uploaded = request.FILES.get('file') or request.FILES.get('pdf')
+        if not uploaded:
+            # fallback to any uploaded file
+            files = list(request.FILES.values())
+            uploaded = files[0] if files else None
+
+        if not uploaded:
+            return Response({'error': 'No PDF file uploaded. Provide a file under key "file" or "pdf".'}, status=status.HTTP_400_BAD_REQUEST)
+
+        pages_param = request.data.get('pages')
+        if pages_param is None:
+            return Response({'error': 'Missing "pages" parameter. Example: "1-3,5"'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            pages_list = parse_page_ranges(pages_param)
+        except Exception as e:
+            return Response({'error': f'Invalid pages parameter: {e}'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not pages_list:
+            return Response({'error': 'No valid pages parsed from pages parameter.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Save uploaded file temporarily
+        input_temp_name = default_storage.save('temp_files/' + uploaded.name, ContentFile(uploaded.read()))
+        input_path = default_storage.path(input_temp_name)
+
+        base, ext = os.path.splitext(uploaded.name)
+        out_name = f"{base}-mod.pdf"
+        out_temp_name = os.path.join('temp_files', out_name)
+
+        try:
+            src = fitz.open(input_path)
+            out_doc = fitz.open()
+
+            for p in pages_list:
+                idx = p - 1
+                if idx < 0 or idx >= len(src):
+                    continue
+                out_doc.insert_pdf(src, from_page=idx, to_page=idx)
+
+            if out_doc.page_count == 0:
+                src.close()
+                out_doc.close()
+                default_storage.delete(input_temp_name)
+                return Response({'error': 'No valid pages found in the PDF for the given ranges.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            pdf_bytes = out_doc.write()
+            out_doc.close()
+            src.close()
+
+            temp_out = default_storage.save(out_temp_name, ContentFile(pdf_bytes))
+            out_path = default_storage.path(temp_out)
+
+            with open(out_path, 'rb') as f:
+                resp_bytes = f.read()
+
+            # cleanup
+            default_storage.delete(input_temp_name)
+            default_storage.delete(temp_out)
+
+            response = HttpResponse(resp_bytes, content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="{out_name}"'
+            return response
+
+        except Exception as e:
+            try:
+                default_storage.delete(input_temp_name)
+            except Exception:
+                pass
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
