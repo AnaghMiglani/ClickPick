@@ -11,31 +11,53 @@ from ...permissions import IsAdminOrStaff
 
 class SecureFileDownload(APIView):
     """
-    file download endpoint that requires admin/staff authentication.
+    Secure file download endpoint that requires admin/staff authentication.
     Only allows downloading files associated with printout orders.
     """
     permission_classes = (IsAdminOrStaff, )
     
     def get(self, request, order_id):
+        printout = None
+        
         try:
             printout = ActivePrintOuts.objects.get(order_id=order_id)
         except ActivePrintOuts.DoesNotExist:
             try:
-                printout = PastPrintOuts.objects.get(order_id=order_id)
+                printout = PastPrintOuts.objects.get(order_id=str(order_id))
             except PastPrintOuts.DoesNotExist:
-                return Response({'error': 'Printout not found'}, status=status.HTTP_404_NOT_FOUND)
+                return Response({
+                    'error': 'Printout not found',
+                    'order_id': order_id,
+                    'detail': f'No printout found with order_id={order_id} in active or past printouts'
+                }, status=status.HTTP_404_NOT_FOUND)
         
         if not printout.file:
-            return Response({'error': 'No file associated with this order'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({
+                'error': 'No file associated with this order',
+                'order_id': order_id
+            }, status=status.HTTP_404_NOT_FOUND)
         
-        file_path = printout.file.path
+        try:
+            file_path = printout.file.path
+        except Exception as e:
+            return Response({
+                'error': 'Error accessing file path',
+                'detail': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
         if not os.path.exists(file_path):
-            return Response({'error': 'File not found on server'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({
+                'error': 'File not found on server',
+                'file_path': file_path,
+                'detail': f'File exists in database but not on filesystem'
+            }, status=status.HTTP_404_NOT_FOUND)
         
         try:
             response = FileResponse(open(file_path, 'rb'))
             response['Content-Disposition'] = f'attachment; filename="{os.path.basename(file_path)}"'
             return response
         except Exception as e:
-            return Response({'error': f'Error serving file: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({
+                'error': 'Error serving file',
+                'detail': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

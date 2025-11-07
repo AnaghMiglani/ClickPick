@@ -76,7 +76,7 @@ class ActivePrintOuts(models.Model):
     
     coloured_pages = models.CharField(max_length=20)
     black_and_white_pages = models.CharField(max_length=20)
-    print_on_one_side = models.BooleanField()
+    print_on_one_side = models.BooleanField(null=True, blank=True)
     cost = models.DecimalField(max_digits=6, decimal_places=2)
     custom_message = models.TextField(blank=True)
     order_time = models.DateTimeField(auto_now_add=True)
@@ -99,7 +99,7 @@ class PastPrintOuts(models.Model):
 
     coloured_pages = models.CharField(max_length=20)
     black_and_white_pages = models.CharField(max_length=20)
-    print_on_one_side = models.BooleanField()
+    print_on_one_side = models.BooleanField(null=True, blank=True)
     cost = models.DecimalField(max_digits=6, decimal_places=2)
     custom_message = models.TextField(blank=True)
     order_time = models.DateTimeField()

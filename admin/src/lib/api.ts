@@ -173,6 +173,11 @@ export const api = {
 
   downloadPrintoutFile: async (orderId: number): Promise<void> => {
     const token = localStorage.getItem("access_token");
+    
+    if (!token) {
+      throw new Error("Not authenticated - please log in again");
+    }
+    
     const url = `${API_BASE_URL}/stationery/admin/printouts/${orderId}/download/`;
     
     const response = await fetch(url, {
@@ -182,18 +187,29 @@ export const api = {
     });
 
     if (!response.ok) {
-      throw new Error(`Download failed: ${response.statusText}`);
+      const errorData = await response.json().catch(() => ({ detail: response.statusText }));
+      throw new Error(errorData.detail || `Download failed: ${response.statusText}`);
     }
 
     const blob = await response.blob();
-    const downloadUrl = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = downloadUrl;
-    a.download = `printout-${orderId}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(downloadUrl);
-    document.body.removeChild(a);
+    const blobUrl = window.URL.createObjectURL(blob);
+    
+    // Open PDF in new tab
+    window.open(blobUrl, '_blank');
+    
+    // Clean up the blob URL after a short delay to allow the tab to open
+    setTimeout(() => {
+      window.URL.revokeObjectURL(blobUrl);
+    }, 1000);
+
+    //  download logic 
+    // const a = document.createElement('a');
+    // a.href = blobUrl;
+    // a.download = `printout-${orderId}.pdf`;
+    // document.body.appendChild(a);
+    // a.click();
+    // window.URL.revokeObjectURL(blobUrl);
+    // document.body.removeChild(a);
   },
 
   getMyActiveOrders: async (): Promise<Order[]> => {

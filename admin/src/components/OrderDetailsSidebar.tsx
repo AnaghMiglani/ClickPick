@@ -65,9 +65,10 @@ export const OrderDetailsSidebar = ({ orderId, isOpen, onClose, onOrderComplete 
       const numericId = parseInt(cleanId);
       await api.downloadPrintoutFile(numericId);
       toast.success("File downloaded successfully");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to download file:", error);
-      toast.error("Failed to download file");
+      const errorMessage = error?.message || "Failed to download file";
+      toast.error(errorMessage);
     }
   };
 
