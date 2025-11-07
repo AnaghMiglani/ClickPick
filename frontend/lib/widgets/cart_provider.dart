@@ -18,9 +18,7 @@ class CartProvider with ChangeNotifier {
 
   /// Adds a new file to the cart.
   void addFile(File file) {
-    // Generate a unique ID (a timestamp is simple and effective)
     final id = DateTime.now().toIso8601String();
-    // Get the file name from the path
     final fileName = file.path.split('/').last;
 
     _items.putIfAbsent(
@@ -28,15 +26,13 @@ class CartProvider with ChangeNotifier {
           () => PrintJob(
         id: id,
         fileName: fileName,
-        // You would also store the actual file path or bytes here
-        // to upload later.
-        // file: file,
+        file: file, // <--- PASS THE FILE HERE
       ),
     );
-
-    // This is the most important part:
-    // It tells any widgets listening to this provider to rebuild.
     notifyListeners();
+
+
+
   }
 
   /// Updates an existing item in the cart.

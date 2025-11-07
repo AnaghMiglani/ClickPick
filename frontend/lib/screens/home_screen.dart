@@ -1,9 +1,9 @@
 import 'package:clickpic/constants/colors.dart';
-import 'package:clickpic/constants/fonts.dart';
 import 'package:clickpic/widgets/custom_text_field.dart';
 import 'package:flutter/material.dart';
 import 'package:clickpic/screens/upload_screen.dart';
 import 'package:clickpic/screens/notification_screen.dart';
+import 'package:clickpic/screens/orderhistory_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -132,7 +132,13 @@ class HomeScreen extends StatelessWidget {
                     icon: Icons.access_time,
                     label: 'Order\nHistory',
                     color: const Color(0xFFB84E00),
-                    onTap: () {},
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const OrderHistoryScreen()),
+                      );
+                    },
 
                   ),
                   _buildMenuItem(
@@ -159,12 +165,10 @@ class HomeScreen extends StatelessWidget {
             ),
           ),
           
-          // Scrollable content section
           Expanded(
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                // Print Partners Section
                 _buildPrintPartnerCard(
                   name: 'Stationery and Prints Cafe',
                   location: 'Maharaja Agrasen Institute of Technolog...',

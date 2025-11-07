@@ -31,16 +31,20 @@ class UserDetails(APIView):
         return Response(serializer_data, status=status.HTTP_200_OK)
 
 class UserRegister(APIView):
-
+    """
+    Public registration endpoint - creates STUDENT users only.
+    ADMIN/STAFF users must be created via Django admin panel for now
+    """
     def post(self, request):
-        user_serializer = UserSerializer(data=request.data)
+        data = request.data.copy()
+        
+        #Force role to STUDENT 
+        data['role'] = 'STUDENT'
+        
+        user_serializer = UserSerializer(data=data)
 
         if user_serializer.is_valid():
             user_serializer.save()
-            # return redirect('user_login')
-            # user_login_instance = UserLogin()
-            # return user_login_instance.post(request)
-            # return UserLogin().post(request ,  email =  request.data.get('email') , password = request.data.get('password') )    #after successful registration, login the user too
             return Response({'message': 'User Created Successfully'}, status=status.HTTP_201_CREATED)
         else:
             return Response(user_serializer.errors, status=status.HTTP_400_BAD_REQUEST)

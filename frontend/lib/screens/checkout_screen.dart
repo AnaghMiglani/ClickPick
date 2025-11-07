@@ -1,4 +1,3 @@
-import 'package:clickpic/screens/upload_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
@@ -9,6 +8,7 @@ import 'package:clickpic/widgets/custom_button.dart';
 import 'package:clickpic/widgets/progressstepper.dart';
 import 'package:clickpic/screens/orderporcessing_screen.dart';
 import 'package:clickpic/widgets/summary_row.dart';
+import 'package:clickpic/service/api_service.dart';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({super.key});
@@ -19,7 +19,10 @@ class CheckoutScreen extends StatefulWidget {
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
   late Razorpay _razorpay;
-
+  bool _isProcessing = false;
+  bool _isCalculatingCost = true;
+  double _calculatedSubtotal = 0.0;
+  String? _costError;
   @override
   void initState() {
     super.initState();
@@ -27,6 +30,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
     _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
     _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
+    getcost();
   }
 
   @override
@@ -34,15 +38,37 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     _razorpay.clear();
     super.dispose();
   }
+  Future<void> getcost() async {
+    final cart = context.read<CartProvider>();
+    final api = ApiService();
 
+    final cost = await api.calculateTotalCost(cart.itemList);
+
+    if (mounted) {
+      setState(() {
+        _isCalculatingCost = false;
+        if (cost != null) {
+          _calculatedSubtotal = cost;
+        } else {
+          _costError = "Could not calculate exact cost. Using estimate.";
+          _calculatedSubtotal = cart.totalPrice;
+        }
+      });
+    }
+  }
   void _handlePaymentSuccess(PaymentSuccessResponse response) {
-    Navigator.pushReplacement(
+
+    Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (context) => const OrderProcessingScreen()),
+          (route) => false,
     );
   }
 
   void _handlePaymentError(PaymentFailureResponse response) {
+    setState(() {
+      _isProcessing = false;
+    });
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Payment Failed: ${response.message}'),
@@ -54,17 +80,66 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   void _handleExternalWallet(ExternalWalletResponse response) {
   }
 
-  void _openCheckout(String amountInPaise) {
-    // TODO:
+  /// 1. New function to handle the 2-step process: Upload -> Pay
+  Future<void> _processOrder(double totalAmount) async {
+    setState(() {
+      _isProcessing = true;
+    });
+
+    final cart = context.read<CartProvider>();
+    final apiService = ApiService();
+
+    // Step 1: Upload Files to Backend
+    bool uploadSuccess = await apiService.uploadPrintOrders(cart.itemList, totalAmount);
+
+    if (!uploadSuccess) {
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to upload order details. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    // Step 2: If upload succeeded, proceed to Payment
+    _openCheckout(totalAmount);
+  }
+
+  /// 2. Existing function to open Razorpay
+  void _openCheckout(double totalAmount) async {
+    final apiService = ApiService();
+    final orderId = await apiService.createRazorpayOrder(totalAmount);
+
+    if (orderId == null) {
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to initialize payment. Please try again.')),
+        );
+      }
+      return;
+    }
 
     var options = {
-      'key': 'YOUR_RAZORPAY_KEY_ID', // TODO: Replace with your key
-      'amount': amountInPaise,
+      'key': 'YOUR_RAZORPAY_KEY_ID', // TODO: Replace with your actual Razorpay Key ID
+      'amount': (totalAmount * 100).toInt(), // Amount in paise
       'name': 'ClickPic',
+      'order_id': orderId, // Correct key is usually 'order_id', not 'orderid' for standard integration
       'description': 'Print Order',
       'prefill': {
-        'contact': '8888888888', // TODO: Get user's real phone
-        'email': 'test.user@example.com' // TODO: Get user's real email
+        'contact': '9876543210', // TODO: Use actual user data
+        'email': 'user@example.com' // TODO: Use actual user data
+      },
+      'external': {
+        'wallets': ['paytm']
       }
     };
 
@@ -72,6 +147,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _razorpay.open(options);
     } catch (e) {
       debugPrint('Error opening Razorpay: $e');
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+        });
+      }
     }
   }
 
@@ -79,10 +159,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Widget build(BuildContext context) {
     final cart = context.watch<CartProvider>();
     final cartItems = cart.itemList;
-    final double subtotal = cart.totalPrice;
-    final double tax = subtotal * 0.05; // Example 5% tax
+    final double subtotal = _calculatedSubtotal;
+    final double tax = subtotal * 0.05;
     final double totalAmount = subtotal + tax;
-    final String totalAmountInPaise = (totalAmount * 100).toStringAsFixed(0);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -102,55 +181,79 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const ProgressStepper(currentStep: 2), // This is Step 3
+            const ProgressStepper(currentStep: 2),
             const SizedBox(height: 32),
 
             const Text('Order Summary',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(12),
+            if (_isCalculatingCost)
+              const Padding(
+                padding: EdgeInsets.all(32.0),
+                child: Center(child: Column(
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text("Analyzing files for exact cost..."),
+                  ],
+                )),
+              )
+            else ...[
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  children: [
+                    if (cartItems.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8.0),
+                        child: Text("Your cart is empty"),
+                      )
+                    else
+                      ...cartItems
+                          .map((item) => _buildCartItemRow(item: item))
+                          .toList(),
+                    const Divider(height: 24),
+                    SummaryRow(
+                        title: 'Subtotal',
+                        amount: '₹${subtotal.toStringAsFixed(2)}'),
+                    const SizedBox(height: 8),
+                    SummaryRow(
+                        title: 'Tax & Fees (5%)',
+                        amount: '₹${tax.toStringAsFixed(2)}'),
+                    const Divider(height: 24),
+                    SummaryRow(
+                        title: 'Total',
+                        amount: '₹${totalAmount.toStringAsFixed(2)}',
+                        isTotal: true),
+                  ],
+                ),
               ),
-              child: Column(
-                children: [
-                  ...cartItems
-                      .map((item) => _BuildCartItemRow(item: item))
-                      .toList(),
-                  const Divider(height: 24),
-                  SummaryRow(
-                      title: 'Subtotal',
-                      amount: '₹${subtotal.toStringAsFixed(2)}'),
-                  const SizedBox(height: 8),
+              if (_costError != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8.0),
+                  child: Text(_costError!, style: const TextStyle(color: Colors.red, fontSize: 12)),
+                ),
+            ],
 
-
-                  const SizedBox(height: 8),
-                  SummaryRow(
-                      title: 'Tax & Fees',
-                      amount: '₹${tax.toStringAsFixed(2)}'),
-                  const Divider(height: 24),
-                  SummaryRow(
-                      title: 'Total',
-                      amount: '₹${totalAmount.toStringAsFixed(2)}',
-                      isTotal: true),
-                ],
-              ),
-            ),
-            const SizedBox(height: 245,),
+            const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
               height: 50,
               child: OutlinedButton.icon(
                 onPressed: () {
-                  Navigator.of(context).pop();
-                  Navigator.of(context).pop();
+                  Navigator.of(context).popUntil((route) => route.isFirst);
                 },
-                icon: const Icon(Icons.add_circle_outline, color: AppColors.primary, size: 24), // <-- Note: 50 is too big for a button icon
+                icon: const Icon(
+                    Icons.add_circle_outline, color: AppColors.primary,
+                    size: 24),
                 label: const Text(
                   'Add More Files',
-                  style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                      color: AppColors.primary, fontWeight: FontWeight.bold),
                 ),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.primary,
@@ -161,22 +264,35 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 ),
               ),
             ),
-            const SizedBox(height:10,),
-            CustomButton(
+            const SizedBox(height: 16),
+            _isProcessing
+                ? const Center(child: CircularProgressIndicator())
+                : CustomButton(
               text: 'Proceed to Pay',
               onTap: () {
-                _openCheckout(totalAmountInPaise);
+                if (cartItems.isNotEmpty) {
+                  _processOrder(totalAmount);
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Your cart is empty')),
+                  );
+                }
               },
             ),
+            const SizedBox(height: 30),
           ],
         ),
       ),
     );
   }
 
-  Widget _BuildCartItemRow({required PrintJob item}) {
+  Widget _buildCartItemRow({required PrintJob item}) {
     double basePrice = 50;
+    // Simple price logic placeholder - adjust as needed to match your CartProvider logic
     if (item.color == 'Colored') basePrice += 10;
+    if (item.pageSize == 'A1') basePrice += 40;
+    else if (item.pageSize == 'A2') basePrice += 30;
+
     final double totalItemPrice = basePrice * item.copies;
 
     return Padding(
@@ -185,15 +301,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Expanded(
-            child: Text(
-              '${item.fileName} (x${item.copies})',
-              style: const TextStyle(color: AppColors.gray),
-              overflow: TextOverflow.ellipsis,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.fileName,
+                  style: const TextStyle(fontWeight: FontWeight.w500),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  '${item.copies} x ${item.color}, ${item.pageSize}',
+                  style: const TextStyle(color: AppColors.gray, fontSize: 12),
+                ),
+              ],
             ),
           ),
           Text(
             '₹${totalItemPrice.toStringAsFixed(2)}',
-            style: const TextStyle(color: AppColors.gray),
+            style: const TextStyle(fontWeight: FontWeight.w500),
           ),
         ],
       ),
