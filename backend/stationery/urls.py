@@ -29,6 +29,7 @@ urlpatterns = [
     path('admin/printouts/<int:order_id>/', views.AdminGetPrintoutDetails.as_view(), name='admin_printout_details'),
     path('admin/printouts/<int:order_id>/complete/', views.AdminCompletePrintout.as_view(), name='admin_complete_printout'),
     path('admin/printouts/<int:order_id>/download/', views.SecureFileDownload.as_view(), name='admin_download_file'),
+    path('admin/printout-files/<int:file_id>/download/', views.PrintoutFileDownload.as_view(), name='admin_download_printout_file'),
     
     # post views:
     path('create-order/', views.CreateOrder.as_view(), name='create_order'),

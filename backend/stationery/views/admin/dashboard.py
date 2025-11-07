@@ -2,7 +2,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 
-from ...models import ActiveOrders, PastOrders, ActivePrintOuts, PastPrintOuts
+from ...models import ActiveOrders, PastOrders, ActivePrintOuts, PastPrintOuts, PrintoutFile
 from ...permissions import IsAdminOrStaff
 
 
@@ -36,22 +36,33 @@ class AdminGetAllActivePrintouts(APIView):
     permission_classes = (IsAdminOrStaff, )
     
     def get(self, request):
-        all_printouts = ActivePrintOuts.objects.select_related('user').all()
+        all_printouts = ActivePrintOuts.objects.select_related('user').prefetch_related('files').all()
         
         data = []
         for printout in all_printouts:
+            # Get all files for this printout
+            files_data = []
+            for file_obj in printout.files.all():
+                files_data.append({
+                    'file_id': file_obj.id,
+                    'file_name': file_obj.file_name,
+                    'file_url': request.build_absolute_uri(file_obj.file.url) if file_obj.file else None,
+                    'coloured_pages': file_obj.coloured_pages,
+                    'black_and_white_pages': file_obj.black_and_white_pages,
+                    'print_on_one_side': file_obj.print_on_one_side,
+                    'file_size': file_obj.file_size,
+                })
+            
             data.append({
                 'order_id': printout.order_id,
                 'user_id': printout.user.id if printout.user else None,
                 'user_name': printout.user.name if printout.user else 'Unknown',
                 'user_email': printout.user.email if printout.user else 'N/A',
-                'coloured_pages': printout.coloured_pages,
-                'black_and_white_pages': printout.black_and_white_pages,
-                'print_on_one_side': printout.print_on_one_side,
                 'cost': str(printout.cost),
                 'custom_message': printout.custom_message,
                 'order_time': printout.order_time,
-                'has_file': bool(printout.file),
+                'file': request.build_absolute_uri(printout.file.url) if printout.file else None,
+                'files': files_data,
             })
         
         return Response(data, status=status.HTTP_200_OK)
@@ -87,22 +98,33 @@ class AdminGetAllPastPrintouts(APIView):
     permission_classes = (IsAdminOrStaff, )
     
     def get(self, request):
-        all_printouts = PastPrintOuts.objects.select_related('user').all()
+        all_printouts = PastPrintOuts.objects.select_related('user').prefetch_related('files').all()
         
         data = []
         for printout in all_printouts:
+            # Get all files for this printout
+            files_data = []
+            for file_obj in printout.files.all():
+                files_data.append({
+                    'file_id': file_obj.id,
+                    'file_name': file_obj.file_name,
+                    'file_url': request.build_absolute_uri(file_obj.file.url) if file_obj.file else None,
+                    'coloured_pages': file_obj.coloured_pages,
+                    'black_and_white_pages': file_obj.black_and_white_pages,
+                    'print_on_one_side': file_obj.print_on_one_side,
+                    'file_size': file_obj.file_size,
+                })
+            
             data.append({
                 'order_id': printout.order_id,
                 'user_id': printout.user.id if printout.user else None,
                 'user_name': printout.user.name if printout.user else 'Unknown',
                 'user_email': printout.user.email if printout.user else 'N/A',
-                'coloured_pages': printout.coloured_pages,
-                'black_and_white_pages': printout.black_and_white_pages,
-                'print_on_one_side': printout.print_on_one_side,
                 'cost': str(printout.cost),
                 'custom_message': printout.custom_message,
                 'order_time': printout.order_time,
-                'has_file': bool(printout.file),
+                'file': request.build_absolute_uri(printout.file.url) if printout.file else None,
+                'files': files_data,
             })
         
         return Response(data, status=status.HTTP_200_OK)
@@ -187,12 +209,12 @@ class AdminGetPrintoutDetails(APIView):
     def get(self, request, order_id):
         # Try to find in active printouts first
         try:
-            printout = ActivePrintOuts.objects.select_related('user').get(order_id=order_id)
+            printout = ActivePrintOuts.objects.select_related('user').prefetch_related('files').get(order_id=order_id)
             is_completed = False
         except ActivePrintOuts.DoesNotExist:
             # Try past printouts
             try:
-                printout = PastPrintOuts.objects.select_related('user').get(order_id=order_id)
+                printout = PastPrintOuts.objects.select_related('user').prefetch_related('files').get(order_id=order_id)
                 is_completed = True
             except PastPrintOuts.DoesNotExist:
                 return Response({'error': 'Printout not found'}, status=status.HTTP_404_NOT_FOUND)
@@ -220,23 +242,48 @@ class AdminGetPrintoutDetails(APIView):
                         pass
             return total
         
-        bw_pages = count_pages_in_range(printout.black_and_white_pages)
-        color_pages = count_pages_in_range(printout.coloured_pages)
+        # Get all files for this printout
+        files_list = []
+        total_bw_pages = 0
+        total_color_pages = 0
         
+        printout_files = printout.files.all()
+        for pf in printout_files:
+            # Count pages for this specific file
+            file_bw_pages = count_pages_in_range(pf.black_and_white_pages)
+            file_color_pages = count_pages_in_range(pf.coloured_pages)
+            
+            total_bw_pages += file_bw_pages
+            total_color_pages += file_color_pages
+            
+            files_list.append({
+                'id': pf.id,
+                'file_name': pf.file_name or pf.file.name.split('/')[-1],
+                'file_size': pf.file_size,
+                'uploaded_at': pf.uploaded_at,
+                'coloured_pages': pf.coloured_pages,
+                'black_and_white_pages': pf.black_and_white_pages,
+                'print_on_one_side': pf.print_on_one_side,
+                'total_pages': file_bw_pages + file_color_pages,
+            })
+        
+        # Use file-level specs if available, otherwise these will be empty
         data = {
             'order_id': printout.order_id,
             'user_id': printout.user.id if printout.user else None,
             'user_name': printout.user.name if printout.user else 'Unknown',
             'user_email': printout.user.email if printout.user else 'N/A',
             'user_number': printout.user.number if printout.user else 'N/A',
-            'coloured_pages': printout.coloured_pages,
-            'black_and_white_pages': printout.black_and_white_pages,
-            'print_on_one_side': printout.print_on_one_side,
-            'total_pages': bw_pages + color_pages,
+            'coloured_pages': str(total_color_pages) if total_color_pages > 0 else '',
+            'black_and_white_pages': str(total_bw_pages) if total_bw_pages > 0 else '',
+            'print_on_one_side': printout_files[0].print_on_one_side if printout_files.exists() else None,
+            'total_pages': total_bw_pages + total_color_pages,
             'cost': str(printout.cost),
             'custom_message': printout.custom_message,
             'order_time': printout.order_time,
-            'has_file': bool(printout.file),
+            'has_file': bool(printout.file),  # Legacy single file
+            'files': files_list,  # New: list of all files
+            'files_count': len(files_list),
             'is_completed': is_completed,
         }
         

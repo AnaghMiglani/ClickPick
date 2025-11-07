@@ -2,7 +2,7 @@ from django.contrib import admin
 from import_export.admin import ExportActionMixin
 from django.utils.html import format_html
 
-from . models import ActiveOrders, PastOrders, ActivePrintOuts, PastPrintOuts, Items
+from . models import ActiveOrders, PastOrders, ActivePrintOuts, PastPrintOuts, Items, PrintoutFile
 
 
 
@@ -31,7 +31,7 @@ class ActiveOrdersAdmin(admin.ModelAdmin):
     delete_button.short_description = "Mark order as past"
 
 class ActivePrintoutsAdmin(admin.ModelAdmin):
-    list_display = ['order_id', 'user', 'FILE', 'coloured_pages', 'black_and_white_pages', 'print_on_one_side', 'cost', 'custom_message', 'order_time', 'delete_button']
+    list_display = ['order_id', 'user', 'FILE', 'cost', 'custom_message', 'order_time', 'delete_button']
     
     # Overriding get_actions to remove default delete action because we have implemented custom delete
     def get_actions(self, request):
@@ -72,7 +72,7 @@ class PastOrdersAdmin(ExportActionMixin, admin.ModelAdmin):
         return False
 
 class PastPrintoutsAdmin(admin.ModelAdmin):
-    list_display = ['order_id', 'user', 'FILE', 'coloured_pages', 'black_and_white_pages', 'cost', 'custom_message', 'order_time']    
+    list_display = ['order_id', 'user', 'FILE', 'cost', 'custom_message', 'order_time']    
     
     change_list_template = "stationery/printouts/report_generate_changelist.html"
     
@@ -91,6 +91,33 @@ class PastPrintoutsAdmin(admin.ModelAdmin):
     def FILE(self, obj):
         return format_html("<a href='{url}' target='_blank' style='text-decoration: underline; color: blue;'>{url}</a>", url = obj.file.url if obj.file else '')
 
+
+class PrintoutFileAdmin(admin.ModelAdmin):
+    list_display = ['id', 'get_printout_id', 'file_name', 'file_size_kb', 'black_and_white_pages', 'coloured_pages', 'print_on_one_side', 'uploaded_at', 'FILE']
+    list_filter = ['uploaded_at', 'print_on_one_side']
+    search_fields = ['file_name', 'printout_active__order_id', 'printout_past__order_id']
+    
+    def get_printout_id(self, obj):
+        if obj.printout_active:
+            return f"Active #{obj.printout_active.order_id}"
+        elif obj.printout_past:
+            return f"Past #{obj.printout_past.order_id}"
+        return "N/A"
+    get_printout_id.short_description = "Printout"
+    
+    def file_size_kb(self, obj):
+        return f"{obj.file_size / 1024:.2f} KB" if obj.file_size else "N/A"
+    file_size_kb.short_description = "File Size"
+    
+    def FILE(self, obj):
+        if obj.file:
+            return format_html(
+                "<a href='{url}' target='_blank' style='text-decoration: underline; color: blue;'>View File</a>", 
+                url=obj.file.url
+            )
+        return "No file"
+    FILE.short_description = "Download"
+
  
         
 admin.site.register(Items, ItemsAdmin)
@@ -98,3 +125,4 @@ admin.site.register(ActiveOrders, ActiveOrdersAdmin)
 admin.site.register(PastOrders, PastOrdersAdmin)
 admin.site.register(ActivePrintOuts, ActivePrintoutsAdmin)
 admin.site.register(PastPrintOuts, PastPrintoutsAdmin)
+admin.site.register(PrintoutFile, PrintoutFileAdmin)

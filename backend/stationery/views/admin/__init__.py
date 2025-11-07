@@ -22,6 +22,7 @@ from .order_management import (
 )
 from .file_access import (
     SecureFileDownload,
+    PrintoutFileDownload,
 )
 
 __all__ = [
@@ -42,4 +43,5 @@ __all__ = [
     'AdminCompletePrintout',
     
     'SecureFileDownload',
+    'PrintoutFileDownload',
 ]

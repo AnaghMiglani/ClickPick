@@ -6,7 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 
-from ..models import ActiveOrders, PastOrders, ActivePrintOuts, PastPrintOuts, Items
+from ..models import ActiveOrders, PastOrders, ActivePrintOuts, PastPrintOuts, Items, PrintoutFile
 from ..serializers import (
     ActiveOrdersSerializer, 
     PastOrdersSerializer, 
@@ -138,43 +138,52 @@ class CreatePrintout(APIView):
         custom_messages = request.data.getlist('custom_messages')
 
         try:
-            # Perform the iteration for each file
-            n = len(files)
-
-            for i in range(n):
-                file = files[i]
-                black_and_white_page = black_and_white_pages[i]
-                coloured_page = coloured_pages[i]
-                cost = costs[i]
-                print_on_one_side = print_on_one_side_list[i]
-                custom_message = custom_messages[i]
-                
-                data = {
-                    'user': request.user.pk,
-                    'coloured_pages': coloured_page,
-                    'black_and_white_pages': black_and_white_page,
-                    'cost': float(cost),
-                    'custom_message': custom_message,
-                    'print_on_one_side': print_on_one_side,
-                    'file': file,
-                }
-
-                serializer = ActivePrintoutsSerializer(data=data)
-
-                if serializer.is_valid():
-                    serializer.save()
-                else:
-                    return Response(
-                        {
-                            'message': 'Printout Order Creation Failed', 
-                            'errors': serializer.errors
-                        }, 
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
+            # Calculate total cost for the parent printout order
+            total_cost = sum(float(cost) for cost in costs)
             
-            return Response(
-                {'message': 'Printout Orders Created Successfully'}, 
-                status=status.HTTP_201_CREATED
-            )
+            # Create the parent printout order without print specs
+            parent_data = {
+                'user': request.user.pk,
+                'cost': total_cost,
+                'custom_message': custom_messages[0] if custom_messages else '',
+                'file': files[0],  # Keep the first file for legacy compatibility
+            }
+
+            serializer = ActivePrintoutsSerializer(data=parent_data)
+
+            if serializer.is_valid():
+                parent_printout = serializer.save()
+                
+                # Now create PrintoutFile objects for each file with their individual specs
+                n = len(files)
+                for i in range(n):
+                    file = files[i]
+                    black_and_white_page = black_and_white_pages[i]
+                    coloured_page = coloured_pages[i]
+                    print_on_one_side = print_on_one_side_list[i]
+                    
+                    PrintoutFile.objects.create(
+                        printout_active=parent_printout,
+                        file=file,
+                        file_name=file.name,
+                        file_size=file.size,
+                        coloured_pages=coloured_page,
+                        black_and_white_pages=black_and_white_page,
+                        print_on_one_side=print_on_one_side,
+                    )
+                
+                return Response(
+                    {'message': 'Printout Orders Created Successfully'}, 
+                    status=status.HTTP_201_CREATED
+                )
+            else:
+                return Response(
+                    {
+                        'message': 'Printout Order Creation Failed', 
+                        'errors': serializer.errors
+                    }, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)

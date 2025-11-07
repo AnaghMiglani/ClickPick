@@ -26,15 +26,33 @@ def delete_active_order(request, order_id):
 # For marking an active printout as completed (past)
 @staff_member_required
 def delete_active_printout(request, order_id):
+    from .models import PrintoutFile
     
     active_printout = ActivePrintOuts.objects.get(order_id=order_id)
 
-    new_past_printout = PastPrintOuts(order_id=order_id, user=active_printout.user, coloured_pages=active_printout.coloured_pages,
-                                black_and_white_pages=active_printout.black_and_white_pages, cost=active_printout.cost,
-                                custom_message=active_printout.custom_message, order_time=active_printout.order_time,
-                                file=active_printout.file)
-
+    # Create the past printout without parent-level print specs
+    new_past_printout = PastPrintOuts(
+        order_id=order_id, 
+        user=active_printout.user, 
+        cost=active_printout.cost,
+        custom_message=active_printout.custom_message, 
+        order_time=active_printout.order_time,
+        file=active_printout.file
+    )
     new_past_printout.save()
+    
+    # Move all associated PrintoutFile objects to the past printout
+    for file_obj in active_printout.files.all():
+        PrintoutFile.objects.create(
+            printout_past=new_past_printout,
+            file=file_obj.file,
+            file_name=file_obj.file_name,
+            file_size=file_obj.file_size,
+            coloured_pages=file_obj.coloured_pages,
+            black_and_white_pages=file_obj.black_and_white_pages,
+            print_on_one_side=file_obj.print_on_one_side,
+        )
+    
     active_printout.delete()
     
     return redirect('/admin/stationery/activeprintouts/')

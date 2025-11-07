@@ -48,6 +48,18 @@ export interface Printout {
   custom_message: string;
   order_time: string;
   has_file: boolean;
+  files_count: number;
+}
+
+export interface PrintoutFile {
+  id: number;
+  file_name: string;
+  file_size: number;
+  uploaded_at: string;
+  coloured_pages: string;
+  black_and_white_pages: string;
+  print_on_one_side: boolean | null;
+  total_pages: number;
 }
 
 export interface OrderDetails {
@@ -80,6 +92,8 @@ export interface PrintoutDetails {
   custom_message: string;
   order_time: string;
   has_file: boolean;
+  files: PrintoutFile[];
+  files_count: number;
   is_completed: boolean;
 }
 
@@ -210,6 +224,38 @@ export const api = {
     // a.click();
     // window.URL.revokeObjectURL(blobUrl);
     // document.body.removeChild(a);
+  },
+
+  downloadPrintoutFileById: async (fileId: number): Promise<void> => {
+    const token = localStorage.getItem("access_token");
+    
+    if (!token) {
+      throw new Error("Not authenticated - please log in again");
+    }
+    
+    const url = `${API_BASE_URL}/stationery/admin/printout-files/${fileId}/download/`;
+    
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ detail: response.statusText }));
+      throw new Error(errorData.detail || `Download failed: ${response.statusText}`);
+    }
+
+    const blob = await response.blob();
+    const blobUrl = window.URL.createObjectURL(blob);
+    
+    // Open PDF in new tab
+    window.open(blobUrl, '_blank');
+    
+    // Clean up the blob URL after a short delay to allow the tab to open
+    setTimeout(() => {
+      window.URL.revokeObjectURL(blobUrl);
+    }, 1000);
   },
 
   getMyActiveOrders: async (): Promise<Order[]> => {

@@ -199,9 +199,73 @@ export const OrderDetailsSidebar = ({ orderId, isOpen, onClose, onOrderComplete 
 
           {isPrintout && printoutDetails ? (
             <>
-              {printoutDetails.has_file && (
+              {printoutDetails.files && printoutDetails.files.length > 0 && (
                 <div className="space-y-3">
-                  <h4 className="font-semibold">File</h4>
+                  <h4 className="font-semibold">Files ({printoutDetails.files.length})</h4>
+                  <div className="space-y-4">
+                    {printoutDetails.files.map((file) => (
+                      <div 
+                        key={file.id}
+                        className="p-4 border border-border rounded-lg space-y-3"
+                      >
+                        {/* File Header */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <FileText className="h-5 w-5 text-primary flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{file.file_name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {(file.file_size / 1024).toFixed(2)} KB • {new Date(file.uploaded_at).toLocaleDateString()}
+                              </p>
+                            </div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={async () => {
+                              try {
+                                await api.downloadPrintoutFileById(file.id);
+                                toast.success("File opened in new tab");
+                              } catch (error: any) {
+                                console.error("Failed to download file:", error);
+                                toast.error(error?.message || "Failed to download file");
+                              }
+                            }}
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                        </div>
+
+                        {/* File-specific print specs in grid */}
+                        <div className="grid grid-cols-2 gap-4 pt-2 border-t">
+                          <div>
+                            <p className="text-xs text-muted-foreground">B&W Pages</p>
+                            <p className="text-sm font-medium">{file.black_and_white_pages || 'None'}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Colored Pages</p>
+                            <p className="text-sm font-medium">{file.coloured_pages || 'None'}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Total Pages</p>
+                            <p className="text-sm font-medium">{file.total_pages}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Print Mode</p>
+                            <p className="text-sm font-medium">
+                              {file.print_on_one_side ? 'One Side' : 'Both Sides'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {printoutDetails.has_file && (!printoutDetails.files || printoutDetails.files.length === 0) && (
+                <div className="space-y-3">
+                  <h4 className="font-semibold">File (Legacy)</h4>
                   <Badge 
                     variant="outline"
                     className="px-3 py-2 text-sm font-normal border-primary/30 text-primary bg-primary/5 cursor-pointer"
@@ -213,77 +277,82 @@ export const OrderDetailsSidebar = ({ orderId, isOpen, onClose, onOrderComplete 
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">B&W Pages</p>
-                  <p className="text-lg font-bold">{printoutDetails.black_and_white_pages || '0'}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Colored Pages</p>
-                  <p className="text-lg font-bold">{printoutDetails.coloured_pages || '0'}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Pages</p>
-                  <p className="text-lg font-bold">{printoutDetails.total_pages}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Print Mode</p>
-                  <p className="text-lg font-bold">
-                    {printoutDetails.print_on_one_side ? 'One Side' : 'Both Sides'}
-                  </p>
-                </div>
-              </div>
-
-              {(printoutDetails.black_and_white_pages || printoutDetails.coloured_pages) && (
-                <div className="space-y-3">
-                  <p className="text-sm font-medium">Page Ranges</p>
-                  <div className="space-y-2">
-                    {printoutDetails.black_and_white_pages && (
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">Black & White</p>
-                        <div className="flex flex-wrap gap-2">
-                          {parsePageRange(printoutDetails.black_and_white_pages).map((range, index) => (
-                            <div key={index} className="flex items-center gap-2">
-                              <div className="border border-border rounded px-3 py-2 text-center min-w-[60px]">
-                                <span className="font-medium">{range.from}</span>
-                              </div>
-                              {range.from !== range.to && (
-                                <>
-                                  <span className="text-muted-foreground">to</span>
-                                  <div className="border border-border rounded px-3 py-2 text-center min-w-[60px]">
-                                    <span className="font-medium">{range.to}</span>
-                                  </div>
-                                </>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {printoutDetails.coloured_pages && (
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">Colored</p>
-                        <div className="flex flex-wrap gap-2">
-                          {parsePageRange(printoutDetails.coloured_pages).map((range, index) => (
-                            <div key={index} className="flex items-center gap-2">
-                              <div className="border border-border rounded px-3 py-2 text-center min-w-[60px]">
-                                <span className="font-medium">{range.from}</span>
-                              </div>
-                              {range.from !== range.to && (
-                                <>
-                                  <span className="text-muted-foreground">to</span>
-                                  <div className="border border-border rounded px-3 py-2 text-center min-w-[60px]">
-                                    <span className="font-medium">{range.to}</span>
-                                  </div>
-                                </>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+              {/* Show overall printout specs only if no individual file specs */}
+              {(!printoutDetails.files || printoutDetails.files.length === 0) && (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">B&W Pages</p>
+                      <p className="text-lg font-bold">{printoutDetails.black_and_white_pages || '0'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Colored Pages</p>
+                      <p className="text-lg font-bold">{printoutDetails.coloured_pages || '0'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total Pages</p>
+                      <p className="text-lg font-bold">{printoutDetails.total_pages}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Print Mode</p>
+                      <p className="text-lg font-bold">
+                        {printoutDetails.print_on_one_side ? 'One Side' : 'Both Sides'}
+                      </p>
+                    </div>
                   </div>
-                </div>
+
+                  {(printoutDetails.black_and_white_pages || printoutDetails.coloured_pages) && (
+                    <div className="space-y-3">
+                      <p className="text-sm font-medium">Page Ranges</p>
+                      <div className="space-y-2">
+                        {printoutDetails.black_and_white_pages && (
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1">Black & White</p>
+                            <div className="flex flex-wrap gap-2">
+                              {parsePageRange(printoutDetails.black_and_white_pages).map((range, index) => (
+                                <div key={index} className="flex items-center gap-2">
+                                  <div className="border border-border rounded px-3 py-2 text-center min-w-[60px]">
+                                    <span className="font-medium">{range.from}</span>
+                                  </div>
+                                  {range.from !== range.to && (
+                                    <>
+                                      <span className="text-muted-foreground">to</span>
+                                      <div className="border border-border rounded px-3 py-2 text-center min-w-[60px]">
+                                        <span className="font-medium">{range.to}</span>
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {printoutDetails.coloured_pages && (
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1">Colored</p>
+                            <div className="flex flex-wrap gap-2">
+                              {parsePageRange(printoutDetails.coloured_pages).map((range, index) => (
+                                <div key={index} className="flex items-center gap-2">
+                                  <div className="border border-border rounded px-3 py-2 text-center min-w-[60px]">
+                                    <span className="font-medium">{range.from}</span>
+                                  </div>
+                                  {range.from !== range.to && (
+                                    <>
+                                      <span className="text-muted-foreground">to</span>
+                                      <div className="border border-border rounded px-3 py-2 text-center min-w-[60px]">
+                                        <span className="font-medium">{range.to}</span>
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
 
               {printoutDetails.custom_message && (
