@@ -206,7 +206,11 @@ class CreatePrintout(APIView):
             except Exception:
                 pass
 
+            # Support common alias spelling for coloured/colored
             value = data.get(key, [])
+            if (value is None or value == []) and key == 'colouredpages':
+                # try American spelling as fallback
+                value = data.get('coloredpages', [])
             if isinstance(value, list):
                 return value
             if value is None:
@@ -219,7 +223,11 @@ class CreatePrintout(APIView):
                         return parsed
                 except Exception:
                     pass
-                # Fallback to comma-separated
+                # For page-range fields we must NOT split commas because
+                # the range syntax itself uses commas (e.g. '1-3,5').
+                if key in ('pages', 'colouredpages'):
+                    return [value]
+                # Fallback to comma-separated for other keys
                 return [v.strip() for v in value.split(',') if v.strip()]
             # Other scalar values
             return [value]
@@ -236,31 +244,6 @@ class CreatePrintout(APIView):
             # Perform the iteration for each file
             n = len(files)
 
-            # Helper to normalize list-like inputs so they align with files.
-            # If a list contains a single element, broadcast it to length n.
-            # If empty, replace with n empty strings. If length mismatches
-            # and is not 1, raise a clear error.
-            def _normalize_list(lst, name, default_empty=''):
-                # Convert non-list scalars into list
-                if not isinstance(lst, list):
-                    lst = [lst]
-
-                # If list contains non-string items, keep them as-is (costs may be numbers)
-                if len(lst) == 0:
-                    return [default_empty] * n
-                if len(lst) == 1 and n > 1:
-                    return [lst[0]] * n
-                if len(lst) != n:
-                    raise ValueError(f"Field '{name}' length ({len(lst)}) does not match number of files ({n}). Provide one value per file or a single value to broadcast.")
-                return lst
-
-            # Normalize all per-file lists
-            black_and_white_pages = _normalize_list(black_and_white_pages, 'pages', default_empty='')
-            coloured_pages = _normalize_list(coloured_pages, 'colouredpages', default_empty='')
-            costs = _normalize_list(costs, 'costs', default_empty='0')
-            print_on_one_side_list = _normalize_list(print_on_one_side_list, 'print_on_one_side_list', default_empty='true')
-            custom_messages = _normalize_list(custom_messages, 'custom_messages', default_empty='')
-
             for i in range(n):
                 file = files[i]
                 black_and_white_page = black_and_white_pages[i]
@@ -273,9 +256,9 @@ class CreatePrintout(APIView):
                     'user': request.user.pk,
                     'coloured_pages': coloured_page,
                     'black_and_white_pages': black_and_white_page,
-                    'cost': float(cost) if cost != '' else 0.0,
+                    'cost': float(cost),
                     'custom_message': custom_message,
-                    'print_on_one_side': True if str(print_on_one_side).lower() in ['true', '1', 'yes'] else False,
+                    'print_on_one_side': print_on_one_side,
                     'file': file,
                 }
 
@@ -294,54 +277,22 @@ class CreatePrintout(APIView):
 
 
 def parse_page_ranges(page_ranges):
-    # Be robust: accept None, empty string, a single string like '1-3,5',
-    # or a list of such strings. Skip empty or invalid entries instead
-    # of raising an exception for safety.
-    if not page_ranges:
-        return []
-
     pages_to_check = []
 
-    # If a list is provided, flatten it
-    if isinstance(page_ranges, list):
-        for pr in page_ranges:
-            pages_to_check.extend(parse_page_ranges(pr))
-        return pages_to_check
-
-    # Work with string form
-    s = str(page_ranges).strip()
-    if not s:
-        return []
-
-    parts = [p.strip() for p in s.split(',') if p.strip()]
-    for item in parts:
+    ranges = page_ranges.split(',')
+    for item in ranges:
         if '-' in item:
-            bounds = [b.strip() for b in item.split('-')]
-            if len(bounds) != 2:
-                continue
-            try:
-                start = int(bounds[0])
-                end = int(bounds[1])
-            except ValueError:
-                # skip invalid ranges
-                continue
-            if end >= start:
-                pages_to_check.extend(range(start, end + 1))
-            else:
-                pages_to_check.extend(range(end, start + 1))
+            start, end = map(int, item.split('-'))
+            pages_to_check.extend(range(start, end + 1))
         else:
-            try:
-                pages_to_check.append(int(item))
-            except ValueError:
-                # skip invalid items like empty strings
-                continue
-
-    return pages_to_check
+            pages_to_check.append(int(item))
+    
+    return pages_to_check        
                 
 # To calculate cost for printouts   
 # 2rs for b & w page
 # 5rs for b & w page with output on it
-# 10rs for coloured page
+# 5rs for coloured page
 class CostCalculationView(APIView):
     
     def post(self, request):
@@ -354,13 +305,27 @@ class CostCalculationView(APIView):
         # strings or JSON lists.
         def _get_list_local(key):
             if key == 'files':
-                return request.FILES.getlist('files')
+                # Prefer getlist but fall back to single-file or any uploaded files
+                try:
+                    fl = request.FILES.getlist('files')
+                except Exception:
+                    fl = None
+                if fl:
+                    return fl
+                # direct key
+                single = request.FILES.get('files')
+                if single:
+                    return [single]
+                # otherwise return all uploaded files as a list
+                return list(request.FILES.values())
             data = request.data
             try:
                 return data.getlist(key)
             except Exception:
                 pass
             value = data.get(key, [])
+            if (value is None or value == []) and key == 'colouredpages':
+                value = data.get('coloredpages', [])
             if isinstance(value, list):
                 return value
             if value is None:
@@ -372,12 +337,23 @@ class CostCalculationView(APIView):
                         return parsed
                 except Exception:
                     pass
+                # For page-range fields we must NOT split commas because
+                # the range syntax itself uses commas (e.g. '1-3,5').
+                if key in ('pages', 'colouredpages'):
+                    return [value]
                 return [v.strip() for v in value.split(',') if v.strip()]
             return [value]
 
         files = _get_list_local('files')
         pages = _get_list_local('pages')
         coloured_pages = _get_list_local('colouredpages')
+
+        # Ensure files is always a list
+        if not isinstance(files, list):
+            files = [files]
+
+        if len(files) == 0:
+            return Response({'error': 'No files provided'}, status=status.HTTP_400_BAD_REQUEST)
 
         # initialize the cost to 0
         cost = 0
@@ -386,29 +362,18 @@ class CostCalculationView(APIView):
             # Perform the iteration for each file
             n = len(files)
 
-            # Normalize per-file lists (broadcast single value to all files,
-            # default to empty string if missing, or raise on mismatch).
-            def _normalize_local(lst, name, default_empty=''):
-                if not isinstance(lst, list):
-                    lst = [lst]
-                if len(lst) == 0:
-                    return [default_empty] * n
-                if len(lst) == 1 and n > 1:
-                    return [lst[0]] * n
-                if len(lst) != n:
-                    raise ValueError(f"Field '{name}' length ({len(lst)}) does not match number of files ({n}). Provide one value per file or a single value to broadcast.")
-                return lst
-
-            try:
-                pages = _normalize_local(pages, 'pages', default_empty='')
-                coloured_pages = _normalize_local(coloured_pages, 'colouredpages', default_empty='')
-            except ValueError as ve:
-                return Response({'error': str(ve)}, status=status.HTTP_400_BAD_REQUEST)
-
             for i in range(n):
-                file = files[i]
-                page = pages[i]
-                coloured_page = coloured_pages[i]
+                try:
+                    file = files[i]
+                    page = pages[i]
+                    coloured_page = coloured_pages[i]
+                except IndexError:
+                    # Provide a clear error message showing lengths to aid debugging
+                    return Response({'error': 'Per-file parameter count mismatch',
+                                     'files_count': n,
+                                     'pages_count': len(pages) if isinstance(pages, list) else 1,
+                                     'coloured_pages_count': len(coloured_pages) if isinstance(coloured_pages, list) else 1},
+                                    status=status.HTTP_400_BAD_REQUEST)
 
                 # Save the file temporarily
                 temp_file = default_storage.save('temp_files/' + file.name, ContentFile(file.read()))
