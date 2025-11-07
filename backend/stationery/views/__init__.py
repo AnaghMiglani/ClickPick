@@ -15,6 +15,7 @@ from .utility_views import (
     CostCalculationView,
     FirstPageGenerationView,
     ImageToPdfAPIView,
+    ModPdfView,
 )
 
 from .admin import (
@@ -49,6 +50,7 @@ __all__ = [
     'CostCalculationView',
     'FirstPageGenerationView',
     'ImageToPdfAPIView',
+    "ModPdfView",
     
     # Admin dashboard views
     'AdminGetAllActiveOrders',
